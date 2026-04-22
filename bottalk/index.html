@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1f2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Bottalk</title>
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    :root {
+      --bg: #1a1f2e;
+      --surface: #232a3b;
+      --surface2: #2d3548;
+      --border: #3a4259;
+      --accent: #5b8def;
+      --accent2: #7c6af5;
+      --text: #e8eaf0;
+      --muted: #8892a4;
+      --softer: #4ecdc4;
+      --direct: #ff6b6b;
+      --curious: #ffd93d;
+      --speaker1: #5b8def;
+      --speaker2: #7c6af5;
+      --enneagram-8: #ff6b6b;
+      --enneagram-4: #ffd93d;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .ws-indicator { display:flex; align-items:center; margin-right:8px; }
+    .ws-dot { width:8px; height:8px; border-radius:50%; background:#ef4444; transition:background 0.3s; flex-shrink:0; }
+    .ws-dot.live { background:#4ade80; box-shadow:0 0 6px #4ade80aa; }
+    .ws-dot.offline { background:#ef4444; }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); transition:background 0.3s; flex-shrink:0; }
+    .status-dot.live { background: #4ecdc4; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* Main layout */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Transcript panel */
+    .transcript {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .transcript::-webkit-scrollbar { width: 4px; }
+    .transcript::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .utterance {
+      padding: 8px 12px;
+      border-radius: 12px;
+      max-width: 85%;
+      font-size: 14px;
+      line-height: 1.4;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+    .utterance.unknown { background: var(--accent2); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+    .utterance.speaker_1 { background: var(--surface); border-bottom-left-radius: 4px; }
+    .utterance.speaker_2 { background: var(--accent2); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
+    .utterance.time-marker { background: transparent; color: var(--muted); font-size: 11px; font-style: italic; align-self: center; border: none; padding: 4px 0; }
+    .utterance.system { background: var(--surface2); color: var(--muted); font-size: 12px; text-align: center; border-radius: 8px; max-width: 100%; }
+
+    .timestamp { font-size: 10px; color: var(--muted); margin-top: 2px; padding: 0 4px; }
+
+    /* Right panel */
+    .right-panel {
+      width: 340px;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Summary section */
+    .summary {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+    .summary::-webkit-scrollbar { width: 4px; }
+    .summary::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .summary h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .summary-block {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .summary-block h4 { font-size: 13px; margin-bottom: 6px; color: var(--accent); }
+    .summary-block p { font-size: 13px; line-height: 1.5; color: var(--text); }
+
+    .quote {
+      border-left: 3px solid var(--accent);
+      padding: 6px 10px;
+      margin: 6px 0;
+      background: var(--surface2);
+      border-radius: 0 6px 6px 0;
+      font-size: 13px;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    /* Enneagram alert */
+    .enneagram-alert {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border-left: 3px solid var(--enneagram-8);
+    }
+    .enneagram-alert.type4 { border-left-color: var(--enneagram-4); }
+    .enneagram-alert h4 { font-size: 12px; margin-bottom: 4px; }
+    .enneagram-alert p { font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+    /* Suggestions */
+    .suggestions {
+      border-top: 1px solid var(--border);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+    .suggestions h3 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .suggestion-card {
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+      border: 1px solid transparent;
+    }
+    .suggestion-card:hover { transform: scale(1.02); opacity: 0.9; }
+    .suggestion-card:active { transform: scale(0.98); }
+
+    .suggestion-card.softer { background: linear-gradient(135deg, #1b4a47, #1d3535); border-color: var(--softer); }
+    .suggestion-card.direct { background: linear-gradient(135deg, #4a1f1f, #351d1d); border-color: var(--direct); }
+    .suggestion-card.curious { background: linear-gradient(135deg, #4a3f1f, #352d1d); border-color: var(--curious); }
+
+    .suggestion-card .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+    .softer .label { color: var(--softer); }
+    .direct .label { color: var(--direct); }
+    .curious .label { color: var(--curious); }
+
+    .suggestion-card .text { font-size: 13px; line-height: 1.4; color: var(--text); }
+    .suggestion-card .source { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    .copied-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface2);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      display: none;
+      z-index: 100;
+      border: 1px solid var(--accent);
+    }
+    .copied-toast.show { display: block; animation: fadeIn 0.2s ease; }
+
+    /* Settings overlay */
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      backdrop-filter: blur(4px);
+    }
+    .settings-overlay.open { display: flex; }
+    .settings-panel {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 24px;
+      width: 360px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .settings-panel h2 { font-size: 18px; margin-bottom: 16px; }
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { font-size: 14px; }
+    .setting-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    input[type="text"], input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+      width: 120px;
+    }
+    select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary { background: var(--surface2); color: var(--text); }
+    .btn-close {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 18px;
+      padding: 6px 12px;
+      float: right;
+    }
+
+    /* Manual input */
+    @media (max-width: 700px) { .manual-input { display: flex; } }
+    .manual-input {
+      padding: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+    .manual-input input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .manual-input input:focus { outline: none; border-color: var(--accent); }
+    .manual-input button {
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+    }
+
+    /* No data state */
+    .no-data {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      text-align: center;
+      padding: 20px;
+    }
+    .no-data-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+    .no-data h3 { font-size: 16px; margin-bottom: 6px; }
+    .no-data p { font-size: 13px; line-height: 1.5; }
+
+    /* ─── Mobile tab bar ─────────────────────────────── */
+    .tab-bar {
+      display: none;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+      padding: 0;
+    }
+    .tab-bar-inner {
+      display: flex;
+    }
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      padding: 10px 4px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: color 0.2s;
+    }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn .tab-icon { font-size: 18px; }
+    .tab-btn .tab-badge {
+      position: absolute;
+      top: 4px;
+      right: calc(50% - 14px);
+      background: var(--direct);
+      color: #fff;
+      font-size: 9px;
+      padding: 1px 4px;
+      border-radius: 8px;
+      display: none;
+    }
+    .tab-content { display: none; flex: 1; overflow-y: auto; }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    /* ─── Summary history ───────────────────────────── */
+    .summary-history-bar {
+      display: flex;
+      gap: 6px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--border);
+      scrollbar-width: none;
+    }
+    .summary-history-bar::-webkit-scrollbar { display: none; }
+    .hist-btn {
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hist-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .hist-btn.new { border-color: var(--accent); color: var(--accent); }
+
+    /* ─── Streaming indicator ───────────────────────── */
+    .stream-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #4ade80;
+      animation: streamPulse 1.5s infinite;
+      display: inline-block;
+      margin-right: 4px;
+    }
+    @keyframes streamPulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* Responsive */
+    @media (max-width: 700px) {
+      body { height: 100dvh; overflow: hidden; }
+      /* Hide all desktop layout elements */
+      .main, .main > *, .transcript, .right-panel, .summary, .suggestions {
+        display: none !important;
+      }
+      .tab-bar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; }
+      .tab-content { height: calc(100dvh - 56px); overflow-y: auto; }
+      #tab-live .transcript-mobile,
+      #tab-summary .summary-scroll,
+      #tab-respond .suggestions-scroll { height: 100%; overflow-y: auto; }
+      .manual-input { display: flex !important; }
+    }
+    @media (min-width: 701px) {
+      .mobile-summary { display: none; }
+      .tab-bar { display: none; }
+    }
+
+    .summarize-btn {
+      background: var(--accent2);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 12px;
+      cursor: pointer;
+      margin: 8px 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="status-bar">
+    <div class="ws-indicator" id="wsIndicator"><span class="ws-dot" id="wsDot"></span></div>
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Connecting to bridge...</span>
+    <span style="flex:1"></span>
+    <span id="nextSummaryNote" style="font-size:11px;color:var(--muted)"></span>
+    <button class="summarize-btn" id="summarizeBtn" onclick="requestSummary()">Summarize</button>
+    <button onclick="openSettings()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">⚙️</button>
+  </div>
+
+  <!-- Desktop: side-by-side. Mobile: hidden, tab content shown instead -->
+  <div class="main">
+    <div class="transcript" id="transcript">
+      <div class="no-data">
+        <div class="no-data-icon">🎙️</div>
+        <h3>Waiting for conversation</h3>
+        <p>Make sure Bee is streaming.<br>Or add transcript manually below.</p>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <div class="summary" id="summaryPanel">
+        <h3>Conversation Summary</h3>
+        <div class="no-data" style="height:auto;padding:20px 0;">
+          <p>Summary will appear here after 3 minutes of conversation or on demand.</p>
+        </div>
+      </div>
+
+      <div class="suggestions" id="suggestionsPanel">
+        <h3>Respond Well</h3>
+        <div class="no-data" style="height:auto;padding:10px 0;">
+          <p>Suggestions will appear after the first summary.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile tab content (hidden on desktop) -->
+  <div class="tab-bar">
+    <div class="tab-bar-inner">
+      <button class="tab-btn active" id="tab-btn-live" onclick="showTab('live')">
+        <span class="tab-icon">🎙️</span>
+        Live
+      </button>
+      <button class="tab-btn" id="tab-btn-summary" onclick="showTab('summary')">
+        <span class="tab-icon">📝</span>
+        Summary
+      </button>
+      <button class="tab-btn" id="tab-btn-respond" onclick="showTab('respond')">
+        <span class="tab-icon">💬</span>
+        Respond
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab 1: Live transcript -->
+  <div class="tab-content active" id="tab-live">
+    <div class="transcript-mobile" id="transcriptMobile"></div>
+  </div>
+
+  <!-- Tab 2: Summary history -->
+  <div class="tab-content" id="tab-summary">
+    <div class="summary-history-bar" id="summaryHistoryBar"></div>
+    <div class="summary-scroll" id="summaryScroll">
+      <div id="summaryPanelMobile"></div>
+    </div>
+  </div>
+
+  <!-- Tab 3: Respond -->
+  <div class="tab-content" id="tab-respond">
+    <div class="suggestions-scroll" id="suggestionsPanelMobile"></div>
+  </div>
+
+  <div class="manual-input">
+    <input type="text" id="manualText" placeholder="Type what was said, press Enter..." onkeydown="if(event.key==='Enter')addManualUtterance()">
+    <button onclick="addManualUtterance()">Add</button>
+  </div>
+
+  <div class="copied-toast" id="copiedToast">Copied! Say it out loud.</div>
+
+  <!-- Settings -->
+  <div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-panel">
+      <button class="btn-close" onclick="closeSettings()">✕</button>
+      <h2>⚙️ Bottalk Settings</h2>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enneagram Type — You</div>
+          <div class="setting-desc">Used to detect escalation patterns</div>
+        </div>
+        <select id="settingMyType">
+          <option value="8" selected>8 — The Challenger</option>
+          <option value="1">1 — The Reformer</option>
+          <option value="2">2 — The Helper</option>
+          <option value="3">3 — The Achiever</option>
+          <option value="4">4 — The Individualist</option>
+          <option value="5">5 — The Investigator</option>
+          <option value="6">6 — The Loyalist</option>
+          <option value="7">7 — The Enthusiast</option>
+          <option value="9">9 — The Peacemaker</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Enneagram Type — Partner</div>
+          <div class="setting-desc">For tone-matching suggestions</div>
+        </div>
+        <select id="settingPartnerType">
+          <option value="4" selected>4 — The Individualist</option>
+          <option value="1">1 — The Reformer</option>
+          <option value="2">2 — The Helper</option>
+          <option value="3">3 — The Achiever</option>
+          <option value="5">5 — The Investigator</option>
+          <option value="6">6 — The Loyalist</option>
+          <option value="7">7 — The Enthusiast</option>
+          <option value="8">8 — The Challenger</option>
+          <option value="9">9 — The Peacemaker</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Summary Interval</div>
+          <div class="setting-desc">How often to auto-summarize</div>
+        </div>
+        <select id="settingInterval">
+          <option value="60">Every 1 min</option>
+          <option value="120">Every 2 min</option>
+          <option value="180" selected>Every 3 min</option>
+          <option value="300">Every 5 min</option>
+          <option value="0">Manual only</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Focus Frameworks</div>
+          <div class="setting-desc">Which therapy models to use</div>
+        </div>
+        <select id="settingFramework">
+          <option value="all" selected>All (EFT + CBT + Gottman)</option>
+          <option value="eft">Emotionally Focused Therapy</option>
+          <option value="cbt">Cognitive Behavioral</option>
+          <option value="gottman">Gottman Method</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Partner Speaker Label</div>
+          <div class="setting-desc">Shows in transcript as speaker 2</div>
+        </div>
+        <input type="text" id="settingPartnerName" value="Amanda" style="width:100px;">
+      </div>
+
+      <div style="margin-top:16px; display:flex; gap:8px;">
+        <button class="btn-primary" onclick="saveSettings()" style="flex:1;">Save</button>
+        <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+      </div>
+      <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+        <button class="btn-secondary" onclick="clearTranscript()" style="width:100%;color:var(--direct);">Clear Transcript</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let ws = null;
+    let utterances = [];
+    let summaryInterval = 180;
+    let lastSummaryTime = Date.now();
+    let autoSummaryTimer = null;
+    let summaryHistory = [];      // array of { id, label, summary, suggestions, windowStart, windowEnd }
+    let activeSummaryIdx = -1;   // which history item is currently shown (-1 = live)
+    let currentTab = "live";
+    let liveSummaryCount = 0;    // counts toward next auto-summary window
+    let lastTimeMarker = Date.now();
+    let settings = {
+      myType: "8",
+      partnerType: "4",
+      partnerName: "Amanda",
+      framework: "all",
+      interval: 180,
+    };
+
+    // Load settings
+    try {
+      const saved = localStorage.getItem("bottalk-settings");
+      if (saved) settings = { ...settings, ...JSON.parse(saved) };
+      document.getElementById("settingMyType").value = settings.myType;
+      document.getElementById("settingPartnerType").value = settings.partnerType;
+      document.getElementById("settingPartnerName").value = settings.partnerName;
+      document.getElementById("settingFramework").value = settings.framework;
+      document.getElementById("settingInterval").value = settings.interval;
+    } catch(e) {}
+
+    // WebSocket connection
+    // WebSocket connection — prefer same-origin (/ws) for Tailscale compat
+    const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsSameOrigin = wsProto + "//" + (window.location.host || "localhost") + "/ws";
+    const wsFallback = wsProto + "//" + (window.location.hostname || "localhost") + ":4281";
+
+    function tryConnect(url) {
+      return new Promise((resolve, reject) => {
+        const testWs = new WebSocket(url);
+        testWs.onopen = () => { resolve(testWs); };
+        testWs.onerror = () => { reject(new Error("failed")); };
+        setTimeout(() => reject(new Error("timeout")), 3000);
+      });
+    }
+
+    async function connect() {
+      // Try /ws first (same-origin, Tailscale-compatible)
+      try {
+        ws = await tryConnect(wsSameOrigin);
+        console.log("[Bottalk] Connected via /ws");
+      } catch(e1) {
+        // Fallback to direct :4281
+        try {
+          ws = await tryConnect(wsFallback);
+          console.log("[Bottalk] Connected via :4281");
+        } catch(e2) {
+          console.error("[Bottalk] Both WS attempts failed");
+        }
+      }
+
+      if (!ws) return;
+
+      ws.onopen = () => {
+        document.getElementById("statusDot").className = "status-dot live";
+        document.getElementById("wsDot").className = "ws-dot live";
+        document.getElementById("statusText").textContent = "Live — listening";
+        startAutoSummary();
+      };
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "utterance") {
+            addUtterance(data.text, data.speaker);
+          }
+        } catch(e) {}
+      };
+      ws.onclose = () => {
+        document.getElementById("statusDot").className = "status-dot";
+        document.getElementById("wsDot").className = "ws-dot offline";
+        document.getElementById("statusText").textContent = "Bridge offline — manual mode";
+        clearInterval(autoSummaryTimer);
+      };
+      ws.onerror = () => {
+        document.getElementById("statusDot").className = "status-dot";
+        document.getElementById("wsDot").className = "ws-dot offline";
+        document.getElementById("statusText").textContent = "Bridge offline — manual mode";
+      };
+    }
+
+    connect();
+
+    // ─── Tab navigation ────────────────────────────────
+    function showTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("tab-btn-" + tab).classList.add("active");
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.getElementById("tab-" + tab).classList.add("active");
+      if (tab === "live") syncMobileTranscript();
+      if (tab === "summary") syncMobileSummary();
+      if (tab === "respond") syncMobileSuggestions();
+    }
+
+    function syncMobileTranscript() {
+      const el = document.getElementById("transcriptMobile");
+      if (!el) return;
+      const desktop = document.getElementById("transcript");
+      // Copy only utterance bubbles — not the no-data wrapper
+      const utts = desktop.querySelectorAll(".utterance");
+      const timeMarkers = desktop.querySelectorAll(".utterance.time-marker");
+      let html = "";
+      utts.forEach(u => { html += u.outerHTML; });
+      el.innerHTML = html;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function syncMobileSummary() {
+      const el = document.getElementById("summaryPanelMobile");
+      if (!el) return;
+      const desktop = document.getElementById("summaryPanel");
+      el.innerHTML = desktop.innerHTML;
+    }
+
+    function syncMobileSuggestions() {
+      const el = document.getElementById("suggestionsPanelMobile");
+      if (!el) return;
+      const desktop = document.getElementById("suggestionsPanel");
+      el.innerHTML = desktop.innerHTML;
+    }
+
+    // Poll to sync mobile tabs
+    setInterval(() => {
+      if (currentTab === "live") syncMobileTranscript();
+    }, 2000);
+    setInterval(() => {
+      if (!ws || ws.readyState === WebSocket.CLOSED) connect();
+    }, 5000);
+
+    // Add utterance
+    function addUtterance(text, speaker) {
+      if (!text.trim()) return;
+      const cleaned = text.trim();
+      const now = Date.now();
+      // Insert a time marker every 60 seconds
+      if (now - lastTimeMarker >= 60000) {
+        const mins = Math.floor((now - lastTimeMarker) / 60000);
+        utterances.push({ text: `--- ${mins}m ---`, speaker: "time-marker", time: now });
+        lastTimeMarker = now;
+      }
+      utterances.push({ text: cleaned, speaker, time: now });
+      renderTranscript();
+      checkEscalation(cleaned);
+    }
+
+    function addManualUtterance() {
+      const input = document.getElementById("manualText");
+      const text = input.value.trim();
+      if (!text) return;
+      addUtterance(text, "speaker_1");
+      input.value = "";
+    }
+
+    // Render transcript
+    function renderTranscript() {
+      const el = document.getElementById("transcript");
+      if (utterances.length === 0) return;
+      el.innerHTML = utterances.map((u, i) => {
+        const label = "You";
+        const time = new Date(u.time).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+        return `<div class="utterance ${u.speaker}">${label}: ${u.text}</div>`;
+      }).join("");
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // Escalation detection
+    function checkEscalation(text) {
+      const lower = text.toLowerCase();
+      const myType = settings.myType;
+      const partnerType = settings.partnerType;
+
+      let alert = null;
+      let partnerAlert = false;
+
+      // Enneagram 8 escalation signals (you)
+      if (myType === "8") {
+        const escalationWords = ["no", "not", "won't", "don't", "stop", "you're wrong", "i'm right", "that's stupid", "whatever", "fine", "i don't care", "you're being"];
+        if (escalationWords.some(w => lower.includes(w))) {
+          alert = {
+            type: "8",
+            title: "Your 8 energy is rising",
+            desc: "You're moving toward fight mode. Consider: pausing, asking her need, or softening your position. Type 4 needs to feel heard before problem-solved.",
+          };
+        }
+      }
+
+      // Type 4 withdrawal signals (Amanda)
+      if (partnerType === "4") {
+        const withdrawalWords = ["you don't understand", "never mind", "forget it", "i'm fine", "whatever", "i guess", "it doesn't matter", "you never", "you always"];
+        if (withdrawalWords.some(w => lower.includes(w))) {
+          partnerAlert = true;
+        }
+      }
+
+      if (alert) {
+        renderEnneagramAlert(alert);
+      } else if (partnerAlert && utterances.length > 0) {
+        renderEnneagramAlert({
+          type: "4",
+          title: `${settings.partnerName} may be withdrawing`,
+          desc: "Type 4s withdraw when they feel misunderstood. Don't push for resolution — validate what you hear first.",
+        });
+      }
+    }
+
+    function renderEnneagramAlert(alert) {
+      const summaryEl = document.getElementById("summaryPanel");
+      const alertEl = document.createElement("div");
+      alertEl.className = `enneagram-alert ${alert.type === "4" ? "type4" : ""}`;
+      alertEl.innerHTML = `<h4>⚡ ${alert.title}</h4><p>${alert.desc}</p>`;
+      // Insert near top of summary
+      const h3 = summaryEl.querySelector("h3");
+      if (h3 && !summaryEl.querySelector(".enneagram-alert")) {
+        h3.after(alertEl);
+        setTimeout(() => alertEl.remove(), 30000);
+      }
+    }
+
+    // Summarization — uses last 3-min sliding window, archives to history
+    async function requestSummary() {
+      const now = Date.now();
+      const windowMs = summaryInterval * 1000;
+      // Get utterances from the last [interval] seconds
+      const windowUtts = utterances.filter(u => u.speaker !== "time-marker" && (now - u.time) <= windowMs);
+      if (windowUtts.length < 2) return;
+
+      const transcriptText = windowUtts.map(u => u.text).join("\n");
+      const windowLabel = formatWindowLabel(windowUtts);
+
+      // Archive any existing live summary to history
+      if (activeSummaryIdx === -1 && liveSummaryCount > 0) {
+        const prevSummary = extractCurrentSummary();
+        if (prevSummary) {
+          summaryHistory.unshift({
+            id: Date.now(),
+            label: prevSummary.label,
+            summary: prevSummary.summary,
+            suggestions: prevSummary.suggestions,
+          });
+        }
+      }
+      liveSummaryCount++;
+
+      // Show streaming/loading state with streaming dot
+      activeSummaryIdx = -1;
+      renderStreamingState(windowLabel);
+      renderSummaryHistoryBar();
+
+      // Use local Bottalk summarize proxy → OpenClaw AI
+      let summary = null;
+      let keyQuotes = [];
+      const prompt = buildSummaryPrompt(transcriptText);
+      try {
+        const resp = await fetch("/api/summarize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const text = data.choices?.[0]?.message?.content || "";
+          try {
+            summary = JSON.parse(text);
+          } catch {
+            summary = { emotionalTone: text.slice(0, 200), keyThemes: [], keyQuotes: [], underlyingNeed: "—", escalationRisk: "low" };
+          }
+        }
+      } catch(e) {}
+
+      if (!summary) {
+        summary = localSummarize(transcriptText);
+      }
+
+      renderSummary(summary, keyQuotes);
+      generateSuggestions(transcriptText, summary);
+      lastSummaryTime = now;
+      renderSummaryHistoryBar();
+      syncMobileSummary();
+    }
+
+    function formatWindowLabel(windowUtts) {
+      if (windowUtts.length === 0) return "Now";
+      const t0 = windowUtts[0].time;
+      const t1 = windowUtts[windowUtts.length - 1].time;
+      const fmt = (ms) => new Date(ms).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+      return `${fmt(t0)}–${fmt(t1)}`;
+    }
+
+    function renderStreamingState(windowLabel) {
+      const panel = document.getElementById("summaryPanel");
+      panel.innerHTML = `
+        <h3><span class="stream-dot"></span>${windowLabel}</h3>
+        <div class="no-data" style="height:auto;padding:20px 0;">
+          <p>🤖 Analyzing last ${Math.round(summaryInterval/60)} min...</p>
+        </div>
+      `;
+    }
+
+    function extractCurrentSummary() {
+      const panel = document.getElementById("summaryPanel");
+      const h3 = panel.querySelector("h3");
+      const riskEl = panel.querySelector('[style*="border-left"] h4');
+      const toneEl = panel.querySelector('.summary-block h4');
+      const needEl = panel.querySelectorAll('.summary-block p');
+      if (!h3) return null;
+      return {
+        label: (h3.textContent.split("\n")[0] || "Last summary").trim(),
+        summary: { emotionalTone: toneEl ? toneEl.nextElementSibling?.textContent || "" : "", escalationRisk: riskEl ? riskEl.textContent.replace("Escalation Risk: ","") : "" },
+        suggestions: document.getElementById("suggestionsPanel")?.innerHTML || "",
+      };
+    }
+
+    function renderSummaryHistoryBar() {
+      const bar = document.getElementById("summaryHistoryBar");
+      if (!bar) return;
+      let html = `<button class="hist-btn ${activeSummaryIdx === -1 ? 'active' : ''}" onclick="showLiveSummary()">Live</button>`;
+      summaryHistory.slice(0, 9).forEach((s, i) => {
+        const isNew = i === 0 && activeSummaryIdx !== 0;
+        html += `<button class="hist-btn ${activeSummaryIdx === i + 1 ? 'active' : ''} ${isNew ? 'new' : ''}" onclick="showHistorySummary(${i + 1})">${s.label || 'Earlier'}</button>`;
+      });
+      bar.innerHTML = html;
+    }
+
+    function showLiveSummary() {
+      activeSummaryIdx = -1;
+      // Re-render current live summary
+      const panel = document.getElementById("summaryPanel");
+      const suggPanel = document.getElementById("suggestionsPanel");
+      // The live summary is already in the DOM — just highlight live btn
+      renderSummaryHistoryBar();
+      syncMobileSummary();
+      syncMobileSuggestions();
+    }
+
+    function showHistorySummary(idx) {
+      const item = summaryHistory[idx - 1];
+      if (!item) return;
+      activeSummaryIdx = idx;
+      const panel = document.getElementById("summaryPanel");
+      const suggPanel = document.getElementById("suggestionsPanel");
+      if (item.summary && item.summary.emotionalTone) {
+        const riskColor = item.summary.escalationRisk === "high" ? "var(--direct)" : item.summary.escalationRisk === "medium" ? "var(--curious)" : "var(--softer)";
+        panel.innerHTML = `<h3>${item.label}</h3><div class="summary-block"><h4>Emotional Tone</h4><p>${item.summary.emotionalTone || ''}</p></div><div class="summary-block" style="border-left:3px solid ${riskColor}"><h4 style="color:${riskColor}">Escalation Risk: ${item.summary.escalationRisk || 'low'}</h4></div>`;
+      } else {
+        panel.innerHTML = `<h3>${item.label}</h3><div class="no-data" style="height:auto"><p>${item.summary || 'No summary data'}</p></div>`;
+      }
+      if (item.suggestions) {
+        suggPanel.innerHTML = item.suggestions;
+      }
+      renderSummaryHistoryBar();
+      syncMobileSummary();
+      syncMobileSuggestions();
+    }
+
+    function buildSummaryPrompt(transcript) {
+      return `You are Bottalk, a marital conversation analyzer. Analyze this transcript and return a JSON object with exactly this structure:
+{
+  "emotionalTone": "2-3 sentence description of the emotional quality of the conversation",
+  "keyThemes": ["theme1", "theme2", "theme3"],
+  "keyQuotes": ["exact quote 1", "exact quote 2", "exact quote 3"],
+  "underlyingNeed": "What the speaker (Type 4) likely needs but hasn't expressed directly",
+  "escalationRisk": "low" or "medium" or "high",
+  "topic": "2-4 word label for the main tension or subject being discussed"
+}
+
+TRANSCRIPT:
+${transcript}
+
+Respond with ONLY valid JSON, no markdown fences.`;
+    }
+
+    function localSummarize(transcript) {
+      // Simple fallback when no AI available
+      const lines = transcript.split("\n").filter(l => l.trim());
+      const last5 = lines.slice(-5).join(" ");
+      return {
+        emotionalTone: "Conversation in progress. Awaiting more data for full analysis.",
+        keyThemes: ["Ongoing dialogue"],
+        keyQuotes: [lines.length > 0 ? lines[lines.length - 1] : ""],
+        underlyingNeed: "Keep listening before diagnosing.",
+        escalationRisk: "low",
+      };
+    }
+
+    function renderSummary(summary, keyQuotes) {
+      const panel = document.getElementById("summaryPanel");
+      const q = summary.keyQuotes || keyQuotes;
+
+      let quotesHtml = "";
+      if (q && q.length > 0) {
+        quotesHtml = "<div style='margin-top:8px'><h4 style='font-size:12px;color:var(--muted);margin-bottom:6px;'>Key quotes</h4>";
+        q.slice(0, 3).forEach(quote => {
+          quotesHtml += `<div class="quote">"${quote}"</div>`;
+        });
+        quotesHtml += "</div>";
+      }
+
+      let riskColor = summary.escalationRisk === "high" ? "var(--direct)" : summary.escalationRisk === "medium" ? "var(--curious)" : "var(--softer)";
+
+      panel.innerHTML = `
+        <h3>Conversation Summary</h3>
+        <div class="summary-block">
+          <h4>Emotional Tone</h4>
+          <p>${summary.emotionalTone || "Analyzing..."}</p>
+        </div>
+        <div class="summary-block">
+          <h4>What's Going On</h4>
+          <p>${summary.underlyingNeed || "Keep listening."}</p>
+        </div>
+        ${quotesHtml}
+        <div class="summary-block" style="border-left:3px solid ${riskColor}">
+          <h4 style="color:${riskColor}">Escalation Risk: ${summary.escalationRisk || "low"}</h4>
+          <p style="font-size:12px;color:var(--muted)">
+            ${summary.escalationRisk === "high" ? "Slow down. De-escalate before problem-solving." : summary.escalationRisk === "medium" ? "Stay curious, avoid fixed positions." : "You're in a good space — keep it up."}
+          </p>
+        </div>
+      `;
+    }
+
+    // Response suggestions
+    async function generateSuggestions(transcript, summary) {
+      const framework = settings.framework;
+      const myType = settings.myType;
+      const partnerType = settings.partnerType;
+      const partnerName = settings.partnerName;
+
+      const suggestions = buildSuggestions(myType, partnerType, partnerName, summary, transcript);
+
+      renderSuggestions(suggestions);
+    }
+
+    function buildSuggestions(myType, partnerType, partnerName, summary, transcript) {
+      const escalation = summary.escalationRisk || "low";
+      const topic = summary.topic || "";
+      const tone = summary.emotionalTone || "";
+      const underlyingNeed = summary.underlyingNeed || "";
+
+      const isWithdrawal = underlyingNeed.toLowerCase().includes("seen") ||
+                           underlyingNeed.toLowerCase().includes("valued") ||
+                           underlyingNeed.toLowerCase().includes("understood") ||
+                           underlyingNeed.toLowerCase().includes("abandoned") ||
+                           underlyingNeed.toLowerCase().includes("alone");
+      const isBlame = underlyingNeed.toLowerCase().includes("blame") ||
+                      underlyingNeed.toLowerCase().includes("defensive") ||
+                      underlyingNeed.toLowerCase().includes("criticized");
+      const isShutdown = underlyingNeed.toLowerCase().includes("shut down") ||
+                          underlyingNeed.toLowerCase().includes("overwhelmed") ||
+                          underlyingNeed.toLowerCase().includes("flooded");
+      const isHighConflict = escalation === "high" ||
+                             tone.toLowerCase().includes("angry") ||
+                             tone.toLowerCase().includes("defensive") ||
+                             tone.toLowerCase().includes("tension");
+      const partnerN = settings.partnerName;
+
+      let softerText, directText, curiousText;
+
+      // SOFTER / EFT — validate the Type 4 feeling first
+      if (isWithdrawal) {
+        softerText = partnerN + ", I can hear something underneath what you're saying — it sounds like you're feeling unseen right now. I'm sorry for that. Can you help me understand what I might be missing?";
+      } else if (isBlame) {
+        softerText = "I hear that you're frustrated, and I know I can come across as defensive. That's not who I want to be with you. Can we start over?";
+      } else if (isShutdown) {
+        softerText = "Hey — I can see this is getting heavy. I love you and I want to get this right, even if we need a breather first.";
+      } else if (topic) {
+        softerText = "On the " + topic + " thing — I hear you, and I want to really understand your perspective here. What's this bringing up for you?";
+      } else {
+        softerText = "I want to understand how this feels for you. Can you help me see it from your perspective?";
+      }
+
+      // DIRECT / Gottman — own your part, make a concrete repair
+      if (isHighConflict) {
+        directText = "I think we're getting stuck in a loop. Can we pause and come back to this when we're both calmer? I love you and I want to figure this out.";
+      } else if (isBlame) {
+        directText = "Here's what I think is happening on my end: [own your reaction]. I want us to understand each other better on this.";
+      } else if (topic) {
+        directText = "On " + topic + ": what I need from you is [state it simply]. Can we work through this together?";
+      } else {
+        directText = "Here's what I need: [state your need simply]. I want us to figure this out together.";
+      }
+
+      // CURIOUS / CBT — shift from certainty to genuine curiosity
+      if (isWithdrawal) {
+        curiousText = "What would feel validating to you right now? I want to get this right — tell me what's actually needed.";
+      } else if (isHighConflict) {
+        curiousText = "What's this bringing up for you? I'm noticing I might be making this about me instead of hearing you.";
+      } else if (topic) {
+        curiousText = "Help me understand the " + topic + " piece better — what am I not seeing from your side?";
+      } else {
+        curiousText = "What's the most important thing for me to understand about how this feels for you right now?";
+      }
+
+      return [
+        { label: "Softer — EFT / Attachment", text: softerText, source: "EFT: Soothing the attachment system" },
+        { label: "Direct — Gottman Repair",   text: directText,   source: "Gottman: Repair attempts & Aftermath research" },
+        { label: "Curious — CBT / Growth",    text: curiousText,  source: "CBT: Curiosity over certainty" },
+      ];
+    }
+
+    function renderSuggestions(suggestions) {
+      const panel = document.getElementById("suggestionsPanel");
+      panel.innerHTML = `<h3>Respond Well</h3>`;
+      suggestions.forEach((s, i) => {
+        const card = document.createElement("div");
+        card.className = `suggestion-card ${["softer","direct","curious"][i]}`;
+        card.innerHTML = `
+          <div class="label">${s.label}</div>
+          <div class="text">${s.text}</div>
+          <div class="source">${s.source}</div>
+        `;
+        card.onclick = () => copySuggestion(s.text);
+        panel.appendChild(card);
+      });
+    }
+
+    function copySuggestion(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById("copiedToast");
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      });
+    }
+
+    // Auto summary
+    function startAutoSummary() {
+      if (autoSummaryTimer) clearInterval(autoSummaryTimer);
+      if (summaryInterval === 0) return;
+      updateCountdown();
+      autoSummaryTimer = setInterval(() => {
+        updateCountdown();
+        if (Date.now() - lastSummaryTime >= summaryInterval * 1000 && utterances.length >= 3) {
+          requestSummary();
+        }
+      }, 30000); // check every 30s
+    }
+
+    function updateCountdown() {
+      const el = document.getElementById("countdownNote");
+      if (!el || summaryInterval === 0) return;
+      const remaining = Math.max(0, summaryInterval * 1000 - (Date.now() - lastSummaryTime));
+      const secs = Math.ceil(remaining / 1000);
+      if (secs <= 30) {
+        el.textContent = secs + "s";
+      } else {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        el.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+      }
+    }
+
+    setInterval(updateCountdown, 1000);
+
+    // Settings
+    function openSettings() { document.getElementById("settingsOverlay").classList.add("open"); }
+    function closeSettings() { document.getElementById("settingsOverlay").classList.remove("open"); }
+    function saveSettings() {
+      settings.myType = document.getElementById("settingMyType").value;
+      settings.partnerType = document.getElementById("settingPartnerType").value;
+      settings.partnerName = document.getElementById("settingPartnerName").value;
+      settings.framework = document.getElementById("settingFramework").value;
+      settings.interval = parseInt(document.getElementById("settingInterval").value);
+      localStorage.setItem("bottalk-settings", JSON.stringify(settings));
+      summaryInterval = settings.interval;
+      startAutoSummary();
+      closeSettings();
+    }
+    function clearTranscript() {
+      utterances = [];
+      lastSummaryTime = Date.now();
+      lastTimeMarker = Date.now();
+      summaryHistory = [];
+      activeSummaryIdx = -1;
+      liveSummaryCount = 0;
+      renderSummaryHistoryBar();
+      syncMobileTranscript();
+      syncMobileSummary();
+      document.getElementById("transcript").innerHTML = `<div class="no-data"><div class="no-data-icon">🎙️</div><h3>Transcript cleared</h3><p>Ready for next conversation.</p></div>`;
+      document.getElementById("summaryPanel").innerHTML = `<h3>Conversation Summary</h3><div class="no-data" style="height:auto;padding:20px 0;"><p>Summary will appear here.</p></div>`;
+      document.getElementById("suggestionsPanel").innerHTML = `<h3>Respond Well</h3><div class="no-data" style="height:auto;padding:10px 0;"><p>Suggestions will appear after the first summary.</p></div>`;
+      closeSettings();
+    }
+  </script>
+</body>
+</html>
