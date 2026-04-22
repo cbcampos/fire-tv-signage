@@ -63,6 +63,9 @@
       flex: 1;
       overflow: hidden;
     }
+    @media (max-width: 700px) {
+      .main { display: none !important; }
+    }
 
     /* Transcript panel */
     .transcript {
@@ -85,6 +88,8 @@
       animation: fadeIn 0.3s ease;
     }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+    .utterance { position: relative; }
+    .utt-time { position: absolute; top: 4px; right: 8px; font-size: 9px; color: var(--muted); opacity: 0.6; }
     .utterance.unknown { background: var(--accent2); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
     .utterance.speaker_1 { background: var(--surface); border-bottom-left-radius: 4px; }
     .utterance.speaker_2 { background: var(--accent2); color: #fff; border-bottom-right-radius: 4px; align-self: flex-end; }
@@ -404,6 +409,9 @@
 
     /* Responsive */
     @media (max-width: 700px) {
+      #debug-screen { display: inline-block !important; }
+    }
+    @media (max-width: 700px) {
       body { height: 100dvh; overflow: hidden; }
       /* Hide all desktop layout elements */
       .main, .main > *, .transcript, .right-panel, .summary, .suggestions {
@@ -440,6 +448,7 @@
     <div class="status-dot" id="statusDot"></div>
     <span id="statusText">Connecting to bridge...</span>
     <span style="flex:1"></span>
+    <span id="debug-screen" style="display:none;font-size:10px;color:#ff6b6b;background:#1a1f2e;padding:2px 6px;border-radius:6px;">DEBUG</span>
     <span id="nextSummaryNote" style="font-size:11px;color:var(--muted)"></span>
     <button class="summarize-btn" id="summarizeBtn" onclick="requestSummary()">Summarize</button>
     <button onclick="openSettings()" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;">⚙️</button>
@@ -606,32 +615,15 @@
     // State
     let ws = null;
     let utterances = [];
-    let summaryInterval = 180;
+    // Load settings from localStorage first, then set summaryInterval from it
+    let summaryInterval = settings.interval;
     let lastSummaryTime = Date.now();
     let autoSummaryTimer = null;
-    let summaryHistory = [];      // array of { id, label, summary, suggestions, windowStart, windowEnd }
-    let activeSummaryIdx = -1;   // which history item is currently shown (-1 = live)
+    let summaryHistory = [];
+    let activeSummaryIdx = -1;
     let currentTab = "live";
-    let liveSummaryCount = 0;    // counts toward next auto-summary window
+    let liveSummaryCount = 0;
     let lastTimeMarker = Date.now();
-    let settings = {
-      myType: "8",
-      partnerType: "4",
-      partnerName: "Amanda",
-      framework: "all",
-      interval: 180,
-    };
-
-    // Load settings
-    try {
-      const saved = localStorage.getItem("bottalk-settings");
-      if (saved) settings = { ...settings, ...JSON.parse(saved) };
-      document.getElementById("settingMyType").value = settings.myType;
-      document.getElementById("settingPartnerType").value = settings.partnerType;
-      document.getElementById("settingPartnerName").value = settings.partnerName;
-      document.getElementById("settingFramework").value = settings.framework;
-      document.getElementById("settingInterval").value = settings.interval;
-    } catch(e) {}
 
     // WebSocket connection
     // WebSocket connection — prefer same-origin (/ws) for Tailscale compat
@@ -749,10 +741,12 @@
       // Insert a time marker every 60 seconds
       if (now - lastTimeMarker >= 60000) {
         const mins = Math.floor((now - lastTimeMarker) / 60000);
-        utterances.push({ text: `--- ${mins}m ---`, speaker: "time-marker", time: now });
+        const clockTime = new Date(now).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+        utterances.push({ text: `⏱ ${clockTime}`, speaker: "time-marker", time: now });
         lastTimeMarker = now;
       }
-      utterances.push({ text: cleaned, speaker, time: now });
+      const clockTime = new Date(now).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+      utterances.push({ text: cleaned, speaker, time: now, clockTime });
       renderTranscript();
       checkEscalation(cleaned);
     }
@@ -770,7 +764,7 @@
       const el = document.getElementById("transcript");
       if (utterances.length === 0) return;
       el.innerHTML = utterances.map((u, i) => {
-        const label = "You";
+        const clock = u.clockTime ? `<span class="utt-time">${u.clockTime}</span>` : "";
         const time = new Date(u.time).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
         return `<div class="utterance ${u.speaker}">${label}: ${u.text}</div>`;
       }).join("");
@@ -893,7 +887,9 @@
     }
 
     function formatWindowLabel(windowUtts) {
-      if (windowUtts.length === 0) return "Now";
+      if (windowUtts.length === 0) {
+        return new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) + " – now";
+      }
       const t0 = windowUtts[0].time;
       const t1 = windowUtts[windowUtts.length - 1].time;
       const fmt = (ms) => new Date(ms).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
@@ -930,7 +926,8 @@
       let html = `<button class="hist-btn ${activeSummaryIdx === -1 ? 'active' : ''}" onclick="showLiveSummary()">Live</button>`;
       summaryHistory.slice(0, 9).forEach((s, i) => {
         const isNew = i === 0 && activeSummaryIdx !== 0;
-        html += `<button class="hist-btn ${activeSummaryIdx === i + 1 ? 'active' : ''} ${isNew ? 'new' : ''}" onclick="showHistorySummary(${i + 1})">${s.label || 'Earlier'}</button>`;
+        const label = s.label || 'Earlier';
+        html += `<button class="hist-btn ${activeSummaryIdx === i + 1 ? 'active' : ''} ${isNew ? 'new' : ''}" onclick="showHistorySummary(${i + 1})">${label}</button>`;
       });
       bar.innerHTML = html;
     }
