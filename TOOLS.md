@@ -1,0 +1,82 @@
+# TOOLS.md - Flaire's Toolkit
+
+## Never Do
+
+- **No markdown tables** — Ever. Use bullet lists or plain text.
+
+## X / Twitter Rule
+
+- **When Chris sends an x.com link:** use the `bird` skill first, with the Firefox workaround as part of that flow.
+- Working flow:
+  1. Read Firefox cookies from the snap Firefox profile (`auth_token` + `ct0`)
+  2. Call `bird read <x-url> --auth-token <token> --ct0 <token>`
+- Do **not** start with generic web fetch/browser thrashing.
+- Only ask Chris for pasted text or a screenshot if the bird + Firefox path fails.
+
+## Todoist API
+
+- **Task creation field:** `due_string` — NOT `date_string`
+  - `due_string` → sets a proper due date, returns `due.date` in response
+  - `date_string` → silently ignored by the API, returns `due: null`
+- **Working create payload:**
+  ```python
+  {"content": "Task name", "project_id": "...", "due_string": "Tuesday"}
+  ```
+- **Update (PATCH):** Use POST to same endpoint with task ID appended
+- **Reading tasks:** GET returns `due: null` in response even when due is set — verify creation worked by checking the returned object's `due.date`
+- **Known working token:** `~/.openclaw/.secrets/todoist.env` → `TODOIST_API_TOKEN`
+
+## Available Tools
+
+- **web_search** — Research Instagram trends, marketing tactics, competitor analysis
+- **web_fetch** — Pull content from marketing resources, competitor accounts, trend articles
+- **browser** — Access Instagram, Canva, scheduling tools
+- **todoist** — Track content calendar tasks and deadlines
+- **image** — Analyze photos (before/after transformations, content reference images)
+- **write/edit/read** — Create and update content calendars, brand docs, captions
+
+---
+
+## Quick Commands
+
+### Content Ideas Generator
+When Amanda Claire needs content for the week, use this framework:
+1. **Hook post** (engagement) — Question, relatable struggle, or "POV" style
+2. **Value post** (education) — Tip, tutorial, style formula, outfit formula
+3. **Social proof** (conversion) — Client transformation, testimonial, review
+4. **Personality post** (connection) — Behind-the-scenes, Amanda Claire's journey, real life
+
+### Caption Template
+```
+[HOOK — 1-2 lines that stop the scroll]
+
+[BODY — Value, story, or educational content. 3-8 sentences max.]
+
+[CTA — What do you want them to do? Comment, save, DM, book]
+
+#hashtags [3-5 branded + 15-20 niche/location hashtags]
+```
+
+### Hashtag Strategy
+- **Branded:** #ConfettiCloset #ClosetConfetti #FlaireAmanda (check availability)
+- **Niche:** #PersonalStylist #ClosetStyling #StyleTips #WardrobeGoals
+- **Location:** #BirminghamAL #BirminghamStylist #MagicCityStyle
+
+---
+
+## File Locations
+
+- `memory/brand-guide.md` — Brand voice, colors, fonts, messaging
+- `memory/content-calendar.md` — What to post and when
+- `data/client-transformations.md` — Transformation tracking
+- `data/captions-library.md` — Saved caption templates
+
+---
+
+## Instagram Best Practices
+
+- Reels get reach, Carousels get saves, Stories get engagement
+- Post 3-5x per week minimum for growth
+- Respond to all DMs/comments within 24h
+- Use all 3 Highlights categories: Services, Transformations, About
+- Link in bio for booking (can use linktree or direct)
