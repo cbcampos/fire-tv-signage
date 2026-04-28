@@ -2,12 +2,13 @@
 
 ## 🛒 PRODUCE
 - 4 small onions (3 for burritos, 1 for dirty rice)
-- 4 red bell peppers (2 for burritos, 2 for peanut chicken bowls)
+- 5 red bell peppers (2 for burritos, 2 for peanut chicken bowls, 1 for dirty rice sauté) ← updated count
 - 1 green bell pepper (for dirty rice)
 - 1 large shallot (for green pasta)
 - 5 cloves garlic (for green pasta + dirty rice)
 - 1 tbsp minced garlic (for burritos)
 - 1 tbsp minced jalapeño peppers (for burritos)
+- 2 tbsp grated ginger (for peanut chicken bowls) ← MISSED
 - 2 medium zucchini (for green pasta)
 - 2 medium zucchini (for dirty rice — Sautéed Zucchini & Peppers)
 - 3 carrots (for peanut chicken bowls)
@@ -44,24 +45,29 @@
 - 2 tbsp rice vinegar (for peanut sauce)
 - 2 tbsp honey (for peanut sauce)
 - 2 tbsp sesame oil (for peanut chicken bowls)
+- 5 tbsp olive oil (3 for green pasta, 2 for dirty rice sautéed zucchini & peppers) ← MISSED
 - ½ cup chicken broth (for dirty rice)
 - 1 cup packed brown sugar + 1 tbsp extra (for French toast casserole)
 
 ## 🌶️ SPICES & SEASONINGS
 - 1½ tsp salt (for burritos)
 - 1¼ tsp salt (for green pasta)
+- Black pepper (for dirty rice — salt and pepper to taste) ← MISSED
+- 2 celery stalks, diced (for dirty rice) ← MISSED
 - 2 tsp vanilla extract (for French toast casserole)
+- Garlic powder (for Sautéed Zucchini & Peppers — dirty rice) ← MISSED
 - 2 tsp cinnamon (for French toast casserole)
 - 2 tsp Cajun seasoning (for dirty rice)
 - ½ tsp smoked paprika (for dirty rice)
 - 1½ cups jasmine rice, uncooked (for peanut chicken bowls)
+- 2 cups long-grain white rice, cooked (for dirty rice) ← MISSED
 - Powdered sugar — optional (for French toast casserole topping)
 
 ## 🍞 BREAD & BAKERY
 - ½ loaf French bread, cubed (~8 oz — for French toast casserole, ideally dried out overnight)
 
 ## 📦 PACKAGED
-- 2 boxes Spanish rice mix (Vigo or Zatarain's — for burritos side)
+- 2 boxes Spanish rice mix (Vigo or Zatarain's — for burritos side, each box needs 2 cups water + 1 tbsp butter)
 - 12 oz spiral pasta (for green pasta)
 - ½ cup peanuts (for peanut chicken bowls, garnish)
 - Balsamic glaze — optional (for salad)
