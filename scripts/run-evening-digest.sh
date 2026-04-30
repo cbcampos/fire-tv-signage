@@ -129,11 +129,17 @@ for name, cal_id in cal_ids.items():
         events = []
         for e in data.get('items', []):
             start = e.get('start', {})
+            date_val = start.get('date', '')
             dt_val = start.get('dateTime', '')
-            if dt_val:
+            if date_val:
+                # All-day event
+                events.append('ALL DAY: ' + e.get('summary', 'No title'))
+            elif dt_val:
                 dt = datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
                 dt += timedelta(hours=work_offsets[name])
-                events.append(dt.strftime('%-I:%M %p') + ': ' + e.get('summary', 'No title'))
+                # Flag 12:00 AM events as likely all-day
+                time_str = 'ALL DAY' if dt.hour == 0 and dt.minute == 0 else dt.strftime('%-I:%M %p')
+                events.append(time_str + ': ' + e.get('summary', 'No title'))
         result = sorted(events) if events else ['No events']
     except:
         result = ['No events']
