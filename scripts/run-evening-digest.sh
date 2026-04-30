@@ -66,7 +66,12 @@ if current_lines:
     if text_lines:
         entries.append(' '.join(text_lines[:2]))
 if entries:
-    print(entries[0][:120])
+    note = entries[0][:120].rsplit('. ', 1)[0]
+    if not note.endswith('.'):
+        note += '.'
+    print(note)
+else:
+    print('')
 " 2>/dev/null
 }
 

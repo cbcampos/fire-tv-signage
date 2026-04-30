@@ -119,25 +119,25 @@ def weather_advice(code, rain, wind):
     if not tips: tips.append("Great day to get outside")
     return tips[0]
 
-# ── Parse tasks ────────────────────────────────────────────────────────────────
+# ── Parse tasks (Google Tasks) — incomplete only ─────────────────────────────
 tasks = []
 if TASKS_RAW:
     try:
         task_data = json.loads(TASKS_RAW)
         items = task_data.get("items", [])
-        for item in items[:5]:
+        for item in items:
             tasks.append({
                 "title": item.get("title", ""),
                 "due": item.get("due", ""),
-                "completed": item.get("completed", False),
+                "completed": item.get("completed"),
                 "priority": item.get("priority", "normal"),
             })
     except Exception:
         pass
 
-# ── Parse Bee journals — extract most recent ───────────────────────────────────
+# ── Parse Bee journals — summarize as a topic, not raw text ─────────────────
 def extract_latest_journal(text):
-    """Pull the most recent journal entry text."""
+    """Pull the most recent journal entry, summarize as a topic label."""
     if not text or "### Journal" not in text:
         return None
     lines = text.split("\n")
@@ -151,11 +151,19 @@ def extract_latest_journal(text):
             entry_lines = []
         elif capture:
             entry_lines.append(line)
-    if entry_lines and entry_lines[0].strip():
-        return " ".join(entry_lines[:3]).strip()
+    # entry_lines starts with metadata lines (starting with "- ")
+    # Find first non-metadata line for actual content
+    for i, l in enumerate(entry_lines):
+        stripped = l.strip()
+        if stripped and not stripped.startswith("- "):
+            snippet = " ".join(entry_lines[i:i+3]).strip()
+            summarized = snippet[:120].rsplit(". ", 1)[0]
+            if not summarized.endswith("."):
+                summarized += "."
+            return summarized
     return None
 
-# ── Parse Bee todos — extract open items from last 7 days ─────────────────────
+# ── Parse Bee todos — extract open items from last 7 days ───────────────────
 def extract_open_bee_todos(text):
     """Extract incomplete Bee todos from the last 7 days."""
     if not text or "## Open" not in text:
@@ -253,21 +261,21 @@ if weather_info:
 # Bee daily summary (yesterday's narrative from Bee)
 daily_summary = extract_daily_summary(BEE_DAILY)
 if daily_summary:
+    lines.append("📖 YESTERDAY (Bee Summary)")
     truncated = daily_summary[:200]
     if len(daily_summary) > 200:
         truncated = truncated.rsplit(" ", 1)[0] + "..."
-    lines.append("📖 YESTERDAY (Bee Summary)")
     lines.append(f"   {truncated}")
     lines.append("")
 
-# Bee journals
+# Bee journals + todos
 latest_journal = extract_latest_journal(BEE_JOURNALS)
 open_bee_todos = extract_open_bee_todos(BEE_TODOS)
 
 if latest_journal or open_bee_todos:
     lines.append("🗒️ BEE VOICE NOTES")
     if latest_journal:
-        lines.append(f"   📌 {latest_journal[:150]}")
+        lines.append(f"   📌 {latest_journal}")
     if open_bee_todos:
         for t in open_bee_todos:
             lines.append(f"   ⏳ {t['text'][:60]}")
@@ -297,22 +305,22 @@ else:
         lines.append(f"   Free: {', '.join(fb_strs)}")
 lines.append("")
 
-# Tasks (Google Tasks)
+# Tasks (Google Tasks) — show incomplete only
 lines.append("📋 TOP TASKS")
-if not tasks:
-    lines.append("   No tasks found.")
+incomplete_tasks = [t for t in tasks if not t.get("completed")]
+if not incomplete_tasks:
+    lines.append("   All clear — no pending tasks.")
 else:
-    for t in tasks[:3]:
-        pct = "✅" if t["completed"] else "📌"
+    for t in incomplete_tasks[:5]:
         due_str = ""
-        if t["due"]:
+        if t.get("due"):
             try:
                 due_dt = dtparser.parse(t["due"])
                 due_str = f" (due {due_dt.strftime('%b %d')})"
             except Exception:
                 pass
         pri = "🔴" if t["priority"] == "high" else ("🟡" if t["priority"] == "medium" else "")
-        lines.append(f"   {pct} {pri}{t['title'][:50]}{due_str}")
+        lines.append(f"   📌 {pri}{t['title'][:50]}{due_str}")
 lines.append("")
 
 # Email
