@@ -66,14 +66,13 @@ for e in entries:
     print(e[:120])
 " 2>/dev/null)
 
-# ── Bee todos — last 7 days, open only ─────────────────────────────────────
+# ── Bee todos — last 2 days, open only ─────────────────────────────────────
 BEE_TODOS=$(bee todos list 2>/dev/null || echo "")
-parse_bee_todos() {
-    echo "$1" | python3 -c "
+BEE_OPEN_TODOS=$(echo "$BEE_TODOS" | python3 -c "
 import sys, re
 from datetime import datetime, timezone, timedelta
 lines = sys.stdin.read().split('\n')
-seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+two_days_ago = datetime.now(timezone.utc) - timedelta(days=2)
 in_open = True
 skip_this = False
 todos = []
@@ -89,21 +88,19 @@ for line in lines:
         if date_match:
             try:
                 created = datetime.strptime(date_match.group(1), '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                if created < seven_days_ago:
+                if created < two_days_ago:
                     skip_this = True
             except:
                 pass
     if in_open and '- text:' in line and not skip_this:
         todo_text = line.split('- text:', 1)[1].strip()
-        if todo_text and len(todos) < 3:
+        if todo_text and todo_text not in [t for t in todos]:
             todos.append(todo_text[:60])
 for t in todos:
     print(t)
-" 2>/dev/null
-}
-BEE_OPEN_TODOS=$(parse_bee_todos "$BEE_TODOS")
+" 2>/dev/null)
 
-# ── Calendar — all 3 calendars, parsed in Python ────────────────────────────
+# ── Calendar — all 3 calendars via Python ────────────────────────────────────
 CAL_RAW=$(python3 -c "
 import subprocess, json
 from datetime import datetime, timedelta
@@ -146,9 +143,46 @@ for name, cal_id in cal_ids.items():
         print(' ' + e)
 " 2>/dev/null)
 
-FAMILY_EVENTS=$(echo "$CAL_RAW" | awk '/^CAL:Family$/{found=1; next} /^CAL:/&&found{exit} found{print}' | grep -v '^CAL:' | sed 's/^ //')
-PERSONAL_EVENTS=$(echo "$CAL_RAW" | awk '/^CAL:Personal$/{found=1; next} /^CAL:/&&found{exit} found{print}' | grep -v '^CAL:' | sed 's/^ //')
-WORK_EVENTS=$(echo "$CAL_RAW" | awk '/^CAL:Work$/{found=1; next} /^CAL:/&&found{exit} found{print}' | grep -v '^CAL:' | sed 's/^ //')
+# ── Extract sections with Python — avoids shell subshell bugs ─────────────────
+CAL_PARSED=$(echo "$CAL_RAW" | python3 -c "
+import sys
+lines = [l.rstrip() for l in sys.stdin.read().split('\n')]
+sections = {}
+current = None
+for line in lines:
+    if line.startswith('CAL:'):
+        current = line[4:]
+        sections[current] = []
+    elif current and line.startswith(' ') and not line.startswith('CAL:'):
+        sections[current].append(line.strip())
+for name, events in sections.items():
+    print(name)
+    for e in events:
+        print(' ' + e)
+" 2>/dev/null)
+
+FAM_LIST=$(echo "$CAL_PARSED" | awk '/^Family$/{p=1; next} /^Personal$|^Work$/{p=0} p{print}' | grep -v '^Family$')
+PERS_LIST=$(echo "$CAL_PARSED" | awk '/^Personal$/{p=1; next} /^Family$|^Work$/{p=0} p{print}' | grep -v '^Personal$')
+WORK_LIST=$(echo "$CAL_PARSED" | awk '/^Work$/{p=1; next} /^Family$|^Personal$/{p=0} p{print}' | grep -v '^Work$')
+
+# ── Format calendar sections — avoid subshell pipeline mutation ───────────────
+fmt_cal_block() {
+    local label="$1"
+    local content
+    content="$2"
+    printf "**%s:**\n" "$label"
+    if [ -z "$(echo "$content" | grep -v '^$')" ]; then
+        printf "  • No events\n"
+    else
+        while IFS= read -r line; do
+            [ -n "$line" ] && printf "  • %s\n" "$(echo "$line" | sed 's/^ //')"
+        done <<< "$content"
+    fi
+}
+
+FAM_CAL=$(fmt_cal_block "Family" "$FAM_LIST")
+WRK_CAL=$(fmt_cal_block "Work" "$WORK_LIST")
+PERS_CAL=$(fmt_cal_block "Personal" "$PERS_LIST")
 
 # ── Weather ────────────────────────────────────────────────────────────────
 WEATHER=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit" | python3 -c "
@@ -168,11 +202,6 @@ else
     TOMORROW_DISPLAY=$(date -d "tomorrow" +"%A, %B %d")
 fi
 
-# Clean up empty event vars
-FAM_DISP=$(echo "$FAMILY_EVENTS" | grep -v '^$' | head -10 || echo "  • No events")
-WRK_DISP=$(echo "$WORK_EVENTS" | grep -v '^$' | head -10 || echo "  • No events")
-PERS_DISP=$(echo "$PERSONAL_EVENTS" | grep -v '^$' | head -10 || echo "  • No events")
-
 # Build Bee block
 BEE_BLOCK=""
 if [ -n "$BEE_JOURNALS_TODAY" ] || [ -n "$BEE_OPEN_TODOS" ]; then
@@ -185,25 +214,6 @@ if [ -n "$BEE_JOURNALS_TODAY" ] || [ -n "$BEE_OPEN_TODOS" ]; then
     fi
     BEE_BLOCK+=$'\n'
 fi
-
-# Build calendar sections
-fmt_cal() {
-    local label="$1"
-    local content="$2"
-    echo "**${label}:**"
-    if [ -z "$(echo "$content" | grep -v '^$')" ]; then
-        echo "  • No events"
-    else
-        echo "$content" | while IFS= read -r line; do
-            [ -n "$line" ] && echo "  • $line"
-        done
-    fi
-    echo ""
-}
-
-FAM_CAL=$(fmt_cal "Family" "$FAMILY_EVENTS")
-WRK_CAL=$(fmt_cal "Work" "$WORK_EVENTS")
-PERS_CAL=$(fmt_cal "Personal" "$PERSONAL_EVENTS")
 
 # ── Save to memory ──────────────────────────────────────────────────────────
 mkdir -p ~/.openclaw/workspace/memory/nightly_reviews
