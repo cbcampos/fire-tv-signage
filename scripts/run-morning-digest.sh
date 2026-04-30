@@ -1,7 +1,7 @@
 #!/bin/bash
 # Morning Digest - Daily brief for Master Chris
 # Self-delivers to Discord — no model response needed
-# Sources: Google Calendar + Tasks + Gmail (primary) + Bee journals/todos/daily (supplementary)
+# Sources: Google Calendar (all 3 calendars) + Tasks + Gmail (primary) + Bee journals/todos/daily (supplemental)
 
 source ~/.openclaw/gog.env 2>/dev/null || true
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
@@ -14,7 +14,7 @@ BEE_TODOS=$(bee todos list 2>/dev/null || echo "")
 BEE_DAILY=$(bee daily list --limit 1 2>/dev/null || echo "")
 BEE_NOW=$(bee now 2>/dev/null || echo "")
 
-# ── Calendar: raw JSON ────────────────────────────────────────────────────────
+# ── Calendar: all 3 calendars ────────────────────────────────────────────────
 CALENDAR_FAM=$(gws calendar events list \
     --params "{\"calendarId\": \"fg5muo04j8joetgfjdtgjtccvo@group.calendar.google.com\", \"timeMin\": \"$(date +%Y-%m-%d)T00:00:00Z\", \"timeMax\": \"$(date +%Y-%m-%d)T23:59:59Z\", \"maxResults\": 20, \"singleEvents\": true, \"orderBy\": \"startTime\"}" \
     2>/dev/null)
@@ -23,16 +23,26 @@ CALENDAR_PERS=$(gws calendar events list \
     --params "{\"calendarId\": \"chris.campos@gmail.com\", \"timeMin\": \"$(date +%Y-%m-%d)T00:00:00Z\", \"timeMax\": \"$(date +%Y-%m-%d)T23:59:59Z\", \"maxResults\": 20, \"singleEvents\": true, \"orderBy\": \"startTime\"}" \
     2>/dev/null)
 
-# Combine both calendars into single JSON array
+CALENDAR_WORK=$(gws calendar events list \
+    --params "{\"calendarId\": \"fhlfinoatou6fk56foeu1e820uld5n76@import.calendar.google.com\", \"timeMin\": \"$(date +%Y-%m-%d)T00:00:00Z\", \"timeMax\": \"$(date +%Y-%m-%d)T23:59:59Z\", \"maxResults\": 20, \"singleEvents\": true, \"orderBy\": \"startTime\"}" \
+    2>/dev/null)
+
+# Combine all three calendars into single JSON array
 FAM_ITEMS=$(echo "$CALENDAR_FAM" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(json.dumps(i) for i in d.get('items',[])))" 2>/dev/null || echo "")
 PERS_ITEMS=$(echo "$CALENDAR_PERS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(json.dumps(i) for i in d.get('items',[])))" 2>/dev/null || echo "")
+WORK_ITEMS=$(echo "$CALENDAR_WORK" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(json.dumps(i) for i in d.get('items',[])))" 2>/dev/null || echo "")
 
-if [ -n "$FAM_ITEMS" ] && [ -n "$PERS_ITEMS" ]; then
-    CALENDAR="{\"items\": [${FAM_ITEMS},${PERS_ITEMS}]}"
-elif [ -n "$FAM_ITEMS" ]; then
-    CALENDAR="{\"items\": [${FAM_ITEMS}]}"
+COMBINED=""
+[ -n "$FAM_ITEMS" ] && COMBINED="${FAM_ITEMS}"
+[ -n "$PERS_ITEMS" ] && COMBINED="${COMBINED}${COMBINED:+,}${PERS_ITEMS}"
+[ -n "$WORK_ITEMS" ] && COMBINED="${COMBINED}${COMBINED:+,}${WORK_ITEMS}"
+
+if [ -n "$COMBINED" ]; then
+    CALENDAR="{\"items\": [${COMBINED}]}"
+elif [ -n "$PERS_ITEMS" ]; then
+    CALENDAR="{\"items\": [${PERS_ITEMS}]}"
 else
-    CALENDAR="$CALENDAR_PERS"
+    CALENDAR="$CALENDAR_FAM"
 fi
 
 # ── Tasks: raw JSON ──────────────────────────────────────────────────────────
@@ -66,11 +76,11 @@ python3 ~/.openclaw/workspace/scripts/format-morning-briefing.py 2>/dev/null)
 
 # ── Self-deliver to Discord ──────────────────────────────────────────────────
 if [ -n "$DIGEST" ]; then
-    openclaw message send \
+    timeout 10 openclaw message send \
         --channel discord \
         --target "$DISCORD_CHANNEL" \
         --message "$DIGEST" \
-        2>/dev/null && echo "Delivered" || echo "Delivery failed"
+        2>/dev/null && echo "Delivered" || echo "Delivery failed (timeout or error)"
 else
     echo "No digest generated"
 fi
