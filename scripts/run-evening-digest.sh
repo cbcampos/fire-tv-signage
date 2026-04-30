@@ -9,10 +9,9 @@ export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 DISCORD_CHANNEL="1470900732931735697"
 
 # On Saturdays, show today (the memorial/service is happening NOW) not tomorrow
-# weekday evenings: show tomorrow. Saturday evening: show today.
 DAY_OF_WEEK=$(date +%u)  # 1=Mon, 7=Sun
 if [ "$DAY_OF_WEEK" = "6" ]; then
-    TOMORROW=$(date +%Y-%m-%d)  # Saturday evening → show today
+    TOMORROW=$(date +%Y-%m-%d)
 else
     TOMORROW=$(date -d "tomorrow" +%Y-%m-%d)
 fi
@@ -23,7 +22,99 @@ TOMORROW_END="${TOMORROW}T23:59:59Z"
 BEE_JOURNALS=$(bee journals list 2>/dev/null || echo "")
 BEE_TODOS=$(bee todos list 2>/dev/null || echo "")
 
-# Get tomorrow's calendar using gws
+# ── Bee journals parser ─────────────────────────────────────────────────────
+parse_bee_journals() {
+    local text="$1"
+    if [ -z "$text" ] || [ "$text" = "null" ] || echo "$text" | grep -q "no journals"; then
+        echo ""
+        return
+    fi
+    echo "$text" | python3 -c "
+import sys
+lines = sys.stdin.read().split('\n')
+entries = []
+current_lines = []
+in_meta = False
+for line in lines:
+    if line.startswith('### Journal'):
+        if current_lines:
+            text_lines = []
+            seen_blank = False
+            for l in current_lines:
+                if not l.strip():
+                    seen_blank = True
+                    continue
+                if seen_blank and l.strip() and not l.startswith('- '):
+                    text_lines.append(l.strip())
+            if text_lines:
+                entries.append(' '.join(text_lines[:2]))
+            current_lines = []
+        in_meta = True
+    elif line.startswith('---'):
+        in_meta = False
+    else:
+        current_lines.append(line)
+if current_lines:
+    text_lines = []
+    seen_blank = False
+    for l in current_lines:
+        if not l.strip():
+            seen_blank = True
+            continue
+        if seen_blank and l.strip() and not l.startswith('- '):
+            text_lines.append(l.strip())
+    if text_lines:
+        entries.append(' '.join(text_lines[:2]))
+if entries:
+    print(entries[0][:120])
+" 2>/dev/null
+}
+
+# ── Bee todos parser (last 7 days) ──────────────────────────────────────────
+parse_bee_todos() {
+    local text="$1"
+    if [ -z "$text" ] || [ "$text" = "null" ] || echo "$text" | grep -q "no todos"; then
+        echo ""
+        return
+    fi
+    echo "$text" | python3 -c "
+import sys, re
+from datetime import datetime, timezone, timedelta
+
+lines = sys.stdin.read().split('\n')
+seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+in_open = True
+skip_this = False
+todos = []
+for line in lines:
+    if line.startswith('## Completed'):
+        in_open = False
+        continue
+    if not in_open:
+        continue
+    if 'created_at:' in line:
+        date_match = re.search(r'(\d{4}-\d{2}-\d{2})', line)
+        skip_this = False
+        if date_match:
+            try:
+                created = datetime.strptime(date_match.group(1), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                if created < seven_days_ago:
+                    skip_this = True
+            except:
+                pass
+    if in_open and '- text:' in line and not skip_this:
+        todo_text = line.split('- text:', 1)[1].strip()
+        if todo_text and len(todos) < 3:
+            todos.append(todo_text[:60])
+for t in todos:
+    print(t)
+" 2>/dev/null
+}
+
+BEE_JOURNAL_NOTE=$(parse_bee_journals "$BEE_JOURNALS")
+BEE_OPEN_TODOS=$(parse_bee_todos "$BEE_TODOS")
+
+# ── Calendar ────────────────────────────────────────────────────────────────
 get_cal() {
     local cal_id="$1"
     local params=$(cat <<EOF
@@ -33,12 +124,10 @@ EOF
     gws calendar events list --params "$params" 2>&1
 }
 
-# Fetch all calendars
 FAMILY_CAL=$(get_cal "fg5muo04j8joetgfjdtgjtccvo@group.calendar.google.com")
 WORK_CAL=$(get_cal "fhlfinoatou6fk56foeu1e820uld5n76@import.calendar.google.com")
 PERSONAL_CAL=$(get_cal "chris.campos@gmail.com")
 
-# Parse and format calendar events
 parse_events() {
     local json="$1"
     local is_work="${2:-false}"
@@ -78,7 +167,7 @@ FAMILY_EVENTS=$(parse_events "$FAMILY_CAL" "false")
 WORK_EVENTS=$(parse_events "$WORK_CAL" "true")
 PERSONAL_EVENTS=$(parse_events "$PERSONAL_CAL" "false")
 
-# Get weather for tomorrow
+# ── Weather ────────────────────────────────────────────────────────────────
 WEATHER=$(curl -s "https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit" 2>&1 | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
@@ -87,67 +176,9 @@ if 'daily' in data:
     print(f\"Tomorrow: {d['temperature_2m_max'][0]}°F high, {d['temperature_2m_min'][0]}°F low, {d['precipitation_probability_max'][0]}% rain\")
 else:
     print('Weather unavailable')
-")
-
-# Bee journals → extract recent voice notes
-parse_bee_journals() {
-    local text="$1"
-    if [ -z "$text" ] || [ "$text" = "null" ] || echo "$text" | grep -q "no journals"; then
-        return
-    fi
-    local lines=$(echo "$text" | python3 -c "
-import sys
-lines = sys.stdin.read().split('\n')
-entries = []
-capture_text = False
-current_text = []
-for line in lines:
-    if line.startswith('### Journal'):
-        if current_text:
-            entries.append(' '.join(current_text[:2]).strip())
-            current_text = []
-        capture_text = True
-    elif capture_text and not line.startswith('#') and not line.startswith('---') and line.strip():
-        current_text.append(line.strip())
-if current_text:
-    entries.append(' '.join(current_text[:2]).strip())
-# Only print most recent
-if entries:
-    print(entries[0][:120])
 " 2>/dev/null)
-    if [ -n "$lines" ]; then
-        echo "  🗒️ $lines"
-    fi
-}
 
-# Bee todos → extract open
-parse_bee_todos() {
-    local text="$1"
-    if [ -z "$text" ] || [ "$text" = "null" ] || echo "$text" | grep -q "no todos"; then
-        return
-    fi
-    echo "$text" | python3 -c "
-import sys
-lines = sys.stdin.read().split('\n')
-in_open = True
-todos = []
-for line in lines:
-    if line.startswith('## Completed'):
-        in_open = False
-        continue
-    if in_open and '- text:' in line:
-        todo_text = line.split('- text:', 1)[1].strip()
-        if todo_text and len(todos) < 3:
-            todos.append(f'  ⏳ {todo_text[:60]}')
-for t in todos:
-    print(t)
-" 2>/dev/null
-}
-
-BEE_JOURNAL_NOTE=$(parse_bee_journals "$BEE_JOURNALS")
-BEE_OPEN_TODOS=$(parse_bee_todos "$BEE_TODOS")
-
-# Get action items from promise tracker + active tasks
+# ── Memory Sync ────────────────────────────────────────────────────────────
 MEMORY_SYNC=$(python3 << 'PYEOF'
 import re
 
@@ -193,55 +224,43 @@ print("\n".join(lines))
 PYEOF
 )
 
-# Format output
+# ── Output ────────────────────────────────────────────────────────────────
 if [ "$DAY_OF_WEEK" = "6" ]; then
     TOMORROW_DISPLAY="Today, $(date +"%B %d")"
 else
     TOMORROW_DISPLAY=$(date -d "tomorrow" +"%A, %B %d")
 fi
 
+# Print to stdout (for testing)
 echo "**🌙 EVENING DIGEST - $TOMORROW_DISPLAY**"
 echo ""
 echo "**⛅ TOMORROW'S WEATHER:**"
 echo "$WEATHER"
 echo ""
 
-# Bee voice notes section
 if [ -n "$BEE_JOURNAL_NOTE" ] || [ -n "$BEE_OPEN_TODOS" ]; then
     echo "**🗒️ BEE VOICE NOTES**"
-    [ -n "$BEE_JOURNAL_NOTE" ] && echo "$BEE_JOURNAL_NOTE"
-    [ -n "$BEE_OPEN_TODOS" ] && echo "$BEE_OPEN_TODOS"
+    [ -n "$BEE_JOURNAL_NOTE" ] && echo "  🗒️ $BEE_JOURNAL_NOTE"
+    if [ -n "$BEE_OPEN_TODOS" ]; then
+        echo "$BEE_OPEN_TODOS" | while IFS= read -r todo; do
+            [ -n "$todo" ] && echo "  ⏳ $todo"
+        done
+    fi
     echo ""
 fi
 
 echo "**📅 CALENDAR ($TOMORROW):**"
 echo "**Family:**"
-if [ -z "$FAMILY_EVENTS" ] || echo "$FAMILY_EVENTS" | grep -q "No events"; then
-    echo "  • No events"
-else
-    echo "$FAMILY_EVENTS"
-fi
+[ -z "$FAMILY_EVENTS" ] || echo "$FAMILY_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$FAMILY_EVENTS"
 echo "**Work:**"
-if [ -z "$WORK_EVENTS" ] || echo "$WORK_EVENTS" | grep -q "No events"; then
-    echo "  • No events"
-else
-    echo "$WORK_EVENTS"
-fi
+[ -z "$WORK_EVENTS" ] || echo "$WORK_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$WORK_EVENTS"
 echo "**Personal:**"
-if [ -z "$PERSONAL_EVENTS" ] || echo "$PERSONAL_EVENTS" | grep -q "No events"; then
-    echo "  • No events"
-else
-    echo "$PERSONAL_EVENTS"
-fi
+[ -z "$PERSONAL_EVENTS" ] || echo "$PERSONAL_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$PERSONAL_EVENTS"
 echo ""
 echo "**🧠 ACTION ITEMS (Memory Sync):**"
-if [ -z "$MEMORY_SYNC" ]; then
-    echo "  • No action items"
-else
-    echo "$MEMORY_SYNC"
-fi
+echo "$MEMORY_SYNC"
 
-# Save to memory
+# ── Save to memory ────────────────────────────────────────────────────────────
 mkdir -p ~/.openclaw/workspace/memory/nightly_reviews
 OUTPUT_FILE=~/.openclaw/workspace/memory/nightly_reviews/evening-$(date +%Y-%m-%d).md
 {
@@ -251,8 +270,8 @@ OUTPUT_FILE=~/.openclaw/workspace/memory/nightly_reviews/evening-$(date +%Y-%m-%
     echo "$WEATHER"
     echo ""
     echo "## Bee Voice Notes"
-    [ -n "$BEE_JOURNAL_NOTE" ] && echo "$BEE_JOURNAL_NOTE"
-    [ -n "$BEE_OPEN_TODOS" ] && echo "$BEE_OPEN_TODOS"
+    [ -n "$BEE_JOURNAL_NOTE" ] && echo "  🗒️ $BEE_JOURNAL_NOTE"
+    [ -n "$BEE_OPEN_TODOS" ] && echo "$BEE_OPEN_TODOS" | while IFS= read -r todo; do [ -n "$todo" ] && echo "  ⏳ $todo"; done
     echo ""
     echo "## Calendar - Family"
     echo "$FAMILY_EVENTS"
@@ -270,14 +289,22 @@ OUTPUT_FILE=~/.openclaw/workspace/memory/nightly_reviews/evening-$(date +%Y-%m-%
 echo ""
 echo "✅ Saved to $OUTPUT_FILE"
 
-# Self-deliver to Discord
-FAM_DISP=$(if [ -z "$FAMILY_EVENTS" ] || echo "$FAMILY_EVENTS" | grep -q "No events"; then echo "  • No events"; else echo "$FAMILY_EVENTS"; fi)
-WRK_DISP=$(if [ -z "$WORK_EVENTS" ] || echo "$WORK_EVENTS" | grep -q "No events"; then echo "  • No events"; else echo "$WORK_EVENTS"; fi)
-PERS_DISP=$(if [ -z "$PERSONAL_EVENTS" ] || echo "$PERSONAL_EVENTS" | grep -q "No events"; then echo "  • No events"; else echo "$PERSONAL_EVENTS"; fi)
-MEM_DISP=$(if [ -z "$MEMORY_SYNC" ]; then echo "  • No action items"; else echo "$MEMORY_SYNC"; fi)
-BEE_DISP=""
-[ -n "$BEE_JOURNAL_NOTE" ] && BEE_DISP="${BEE_JOURNAL_NOTE}"$'\n'
-[ -n "$BEE_OPEN_TODOS" ] && BEE_DISP="${BEE_DISP}${BEE_OPEN_TODOS}"$'\n'
+# ── Deliver to Discord ────────────────────────────────────────────────────
+BEE_BLOCK=""
+if [ -n "$BEE_JOURNAL_NOTE" ] || [ -n "$BEE_OPEN_TODOS" ]; then
+    BEE_BLOCK="**🗒️ BEE VOICE NOTES**"$'\n'
+    [ -n "$BEE_JOURNAL_NOTE" ] && BEE_BLOCK="${BEE_BLOCK}  🗒️ ${BEE_JOURNAL_NOTE}"$'\n'
+    if [ -n "$BEE_OPEN_TODOS" ]; then
+        while IFS= read -r todo; do
+            [ -n "$todo" ] && BEE_BLOCK="${BEE_BLOCK}  ⏳ ${todo}"$'\n'
+        done <<< "$BEE_OPEN_TODOS"
+    fi
+    BEE_BLOCK="${BEE_BLOCK}"$'\n'
+fi
+
+FAM_DISP=$(echo "$FAMILY_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$FAMILY_EVENTS")
+WRK_DISP=$(echo "$WORK_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$WORK_EVENTS")
+PERS_DISP=$(echo "$PERSONAL_EVENTS" | grep -q "No events" && echo "  • No events" || echo "$PERSONAL_EVENTS")
 
 openclaw message send \
     --channel discord \
@@ -287,7 +314,7 @@ openclaw message send \
 **⛅ TOMORROW'S WEATHER:**
 $WEATHER
 
-${BEE_DISP}**📅 CALENDAR ($TOMORROW):**
+${BEE_BLOCK}**📅 CALENDAR ($TOMORROW):**
 **Family:**
 $FAM_DISP
 **Work:**
@@ -296,5 +323,5 @@ $WRK_DISP
 $PERS_DISP
 
 **🧠 ACTION ITEMS (Memory Sync):**
-$MEM_DISP" \
+$MEMORY_SYNC" \
     2>/dev/null && echo "📤 Delivered to Discord" || echo "⚠️ Discord delivery failed"

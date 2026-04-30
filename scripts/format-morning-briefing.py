@@ -214,18 +214,19 @@ meeting_hours = sum((e["end"] - e["start"]).total_seconds() / 3600 for e in meet
 
 free_blocks = []
 if events:
-    workday_start = TODAY.replace(hour=8, minute=0, second=0)
-    workday_end = TODAY.replace(hour=18, minute=0, second=0)
+    workday_start = TODAY.replace(hour=8, minute=0, second=0).replace(tzinfo=None)
+    workday_end = TODAY.replace(hour=18, minute=0, second=0).replace(tzinfo=None)
     prev_end = workday_start
     for e in events:
         start = e["start"].replace(tzinfo=None) if e["start"] else None
         end = e["end"].replace(tzinfo=None) if e["end"] else None
         e["start"] = start
         e["end"] = end
-        if start and start > prev_end and (start - prev_end).total_seconds() >= 3600:
+        if start and prev_end and start > prev_end and (start - prev_end).total_seconds() >= 3600:
             free_blocks.append({"start": prev_end, "end": start})
-        prev_end = max(prev_end, end or start)
-    if prev_end < workday_end and (workday_end - prev_end).total_seconds() >= 3600:
+        if end and (not prev_end or end > prev_end):
+            prev_end = end
+    if prev_end and prev_end < workday_end and (workday_end - prev_end).total_seconds() >= 3600:
         free_blocks.append({"start": prev_end, "end": workday_end})
 
 first_event = events[0] if events else None
