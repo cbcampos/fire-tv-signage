@@ -135,9 +135,14 @@ for name, cal_id in cal_ids.items():
                 # All-day event
                 events.append('ALL DAY: ' + e.get('summary', 'No title'))
             elif dt_val:
+                # Filter recurring events: only show if originalStartTime falls on target date
+                orig = e.get('originalStartTime', {})
+                orig_val = orig.get('dateTime', '')
+                target_date = '$TOMORROW_ISO'[:10]
+                if orig_val and orig_val[:10] != target_date:
+                    continue  # Skip recurring events from adjacent days
                 dt = datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
                 dt += timedelta(hours=work_offsets[name])
-                # Flag 12:00 AM events as likely all-day
                 time_str = 'ALL DAY' if dt.hour == 0 and dt.minute == 0 else dt.strftime('%-I:%M %p')
                 events.append(time_str + ': ' + e.get('summary', 'No title'))
         result = sorted(events) if events else ['No events']
