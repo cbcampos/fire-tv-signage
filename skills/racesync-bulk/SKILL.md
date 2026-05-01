@@ -1,10 +1,10 @@
 ---
 name: racesync-bulk
 description: Bulk add complete, detailed running races to RaceSync calendar via POST /api/events/bulk
-version: 2.0.0
+version: 2.1.0
 ---
 
-# RaceSync Bulk Add (v2)
+# RaceSync Bulk Add (v2.1)
 
 Add multiple fully-detailed running races to the RaceSync calendar with one API call.
 
@@ -17,6 +17,20 @@ Add multiple fully-detailed running races to the RaceSync calendar with one API 
 ```
 
 Dobby will: gather full event details → generate AI banner → POST to bulk API → confirm.
+
+## Git Workflow
+
+**Branch:** `migrate/upstash-redis` — all commits go HERE, never main.
+
+**Push after every meaningful change:**
+```bash
+cd ~/.openclaw/workspace/projects/racesync
+git add .
+git commit -m "description"
+git push origin migrate/upstash-redis
+```
+
+Render deploys from `migrate/upstash-redis` branch. Pushing to this branch triggers a redeploy.
 
 ## API Endpoint
 
@@ -40,7 +54,7 @@ Every race added must include ALL of the following:
 | `date` | `2026-10-04` | YYYY-MM-DD format |
 | `location.city` | `Corning` | |
 | `location.state` | `NY` | 2-letter abbreviation |
-| `distances` | `["5K", "Half Marathon", "Marathon"]` | Array, 1 or more |
+| `distances` | `["5K", "Half Marathon", "Marathon"]` | Array, 1 or more — **REQUIRED** |
 
 ### Terrain & Surface
 | Field | Values | Notes |
@@ -90,25 +104,33 @@ Every race added must include ALL of the following:
 
 ---
 
+## Distances — REQUIRED Field
+
+**Every race MUST have distances.** The `distances` array is required for:
+- Displaying distance tags on EventCard and EventHeader
+- Filtering by distance in FiltersSheet
+- Color-coding the EventCard vertical bar and date number
+
+When creating events via bulk API, always include `distances` as an array:
+```json
+"distances": ["5K", "10K", "Half Marathon"]
+```
+
+Acceptable values: `5K`, `10K`, `15K`, `8K`, `Half Marathon`, `Marathon`, `Ultra`, `1 Mile Fun Run`, or custom distances like `"50K"`.
+
+---
+
 ## Banner Image Requirements
 
 **Every event needs a banner.** If no official image exists:
 1. Generate with MiniMax image AI: `image_generate` with prompt describing the race scenery + runners + event vibe
-2. Upload: `curl -F "file=@generated.png" https://tmpfiles.org/api/v1/upload`
+2. Upload: `curl -F "file=@generated.png\" https://tmpfiles.org/api/v1/upload`
 3. Take returned URL, replace `tmpfiles.org/` with `tmpfiles.org/dl/` for direct download
 4. Include `dl/` URL as `bannerUrl`
 
 **Banner size:** Aim for 16:9 aspect ratio. Max ~600KB per image.
 
----
-
-## Common Mistakes to Avoid
-
-1. **Missing `surface` field** — bulk.js didn't map it until fix `bec45ed`. Always include it.
-2. **Elevation as string** — bulk.js converts to Number. Pass numeric feet.
-3. **BTC-only events** — Only Peavine Falls Run and Vulcan Run are BTC races. Peachtree Road Race and Christina Chambers Twilight 5K are NOT BTC-affiliated (no club IDs).
-4. **`sponsorClubIds`/`runClubIds` = empty array `[]`** for non-BTC races, or omit the fields entirely. Do NOT add BTC club ID to non-BTC races.
-5. **UpsertEvent uses `@upstash/redis` SDK** — never raw `fetch` for KV operations in bulk.js. The raw fetch SADD calls were broken (returned 404), silently failing to add event IDs to the `events:ids` set.
+**Wikimedia Fallback:** EventHeader.tsx has automatic Wikimedia fallback based on terrain (Trail → Oak Mountain lake; Road → Birmingham skyline). If `bannerUrl` is missing/empty, the component falls back to these. Always provide a bannerUrl anyway.
 
 ---
 
@@ -146,11 +168,23 @@ Every race added must include ALL of the following:
 
 ---
 
+## Common Mistakes to Avoid
+
+1. **Missing `distances` field** — Every event needs it. No exceptions.
+2. **Missing `surface` field** — bulk.js didn't map it until fix `bec45ed`. Always include it.
+3. **Elevation as string** — bulk.js converts to Number. Pass numeric feet.
+4. **BTC-only events** — Only Peavine Falls Run and Vulcan Run are BTC races. Peachtree Road Race and Christina Chambers Twilight 5K are NOT BTC-affiliated (no club IDs).
+5. **`sponsorClubIds`/`runClubIds` = empty array `[]`** for non-BTC races, or omit the fields entirely. Do NOT add BTC club ID to non-BTC races.
+6. **UpsertEvent uses `@upstash/redis` SDK** — never raw `fetch` for KV operations in bulk.js. The raw fetch SADD calls were broken (returned 404), silently failing to add event IDs to the `events:ids` set.
+
+---
+
 ## Testing
 
 After adding events:
-1. `GET /api/events/:id` — verify all fields saved correctly
-2. `GET /api/events` — confirm event appears in calendar list
-3. Hard refresh RaceSync page — confirm banner renders
+1. `GET /api/events/:id` — verify all fields saved correctly, including distances
+2. `GET /api/events` — confirm event appears in calendar list (note: list endpoint strips `bannerUrl` and `aiDescription` for performance — banners only show on detail page)
+3. Hard refresh RaceSync page — confirm banner renders on detail page
+4. On detail page, confirm distance tags appear below the title
 
 If event missing from list but present via detail endpoint → `events:ids` set SADD failed. Check bulk.js uses `upsertEvent()` not raw `fetch`.
