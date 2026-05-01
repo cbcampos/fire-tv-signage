@@ -250,7 +250,7 @@ $FAM_CAL
 $WRK_CAL
 $PERS_CAL"
 
-timeout 15 openclaw message send \
+timeout 30 openclaw message send \
     --channel discord \
     --target "$DISCORD_CHANNEL" \
     --message "$MESSAGE" \
