@@ -1,0 +1,336 @@
+{# Family Calendar Mode #}
+{# Skylight-inspired daily family calendar view #}
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f192a;
+    color: #fff;
+    height: 100vh;
+    overflow: hidden;
+}
+.fc-wrap {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    padding: 16px 20px;
+    gap: 12px;
+}
+/* ── Header ── */
+.fc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 12px 18px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.fc-header-left {}
+.fc-day-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #ffd700;
+    margin-bottom: 2px;
+}
+.fc-full-date {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #fff;
+}
+.fc-event-count {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+}
+.fc-weather {
+    text-align: right;
+}
+.fc-weather-icon { font-size: 2.4rem; }
+.fc-weather-temp { font-size: 2rem; font-weight: 700; margin-left: 8px; }
+.fc-weather-highlow { font-size: 0.9rem; color: rgba(255,255,255,0.5); }
+/* ── Body ── */
+.fc-body {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 14px;
+    overflow: hidden;
+}
+.fc-day-label {
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #667eea;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid rgba(255,255,255,0.1);
+}
+/* ── Events column ── */
+.fc-events-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.fc-events-col::-webkit-scrollbar { width: 4px; }
+.fc-events-col::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+.fc-event-card {
+    display: flex;
+    align-items: stretch;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: transform 0.2s ease;
+}
+.fc-event-card:hover { transform: translateY(-2px); }
+.fc-event-card.now {
+    border-color: #ffd700;
+    background: rgba(255,215,0,0.08);
+}
+.fc-event-bar {
+    width: 5px;
+    flex-shrink: 0;
+}
+.fc-event-body {
+    padding: 12px 14px;
+    flex: 1;
+}
+.fc-event-time {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 4px;
+}
+.fc-event-card.now .fc-event-time { color: #ffd700; }
+.fc-event-name {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.2;
+}
+.fc-event-loc {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.4);
+    margin-top: 4px;
+}
+.fc-event-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin-top: 6px;
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6);
+}
+.fc-event-card.now .fc-event-badge {
+    background: rgba(255,215,0,0.2);
+    color: #ffd700;
+}
+.fc-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 20px;
+    text-align: center;
+}
+.fc-empty-icon { font-size: 3rem; opacity: 0.4; }
+.fc-empty-text { font-size: 1.2rem; color: rgba(255,255,255,0.4); }
+
+/* ── Sidebar ── */
+.fc-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+.fc-sidebar-section {
+    background: rgba(255,255,255,0.04);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.fc-sidebar-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #ffd700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.fc-now-block {
+    background: rgba(255,215,0,0.1);
+    border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 12px;
+    padding: 14px;
+}
+.fc-now-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #ffd700;
+    margin-bottom: 6px;
+}
+.fc-now-event { font-size: 1.4rem; font-weight: 700; color: #fff; }
+.fc-now-time { font-size: 1rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+.fc-now-free { font-size: 1.2rem; color: #5a9367; font-weight: 600; }
+.fc-next-block {}
+.fc-next-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.fc-next-item:last-child { border-bottom: none; }
+.fc-next-time {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    min-width: 70px;
+    padding-top: 2px;
+}
+.fc-next-name { font-size: 1rem; color: #fff; line-height: 1.3; }
+.fc-tomorrow-block {}
+.fc-tomorrow-event {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.7);
+}
+.fc-tomorrow-event:last-child { border-bottom: none; }
+.fc-tomorrow-time { color: rgba(255,255,255,0.4); font-size: 0.8rem; min-width: 65px; }
+
+/* Live clock */
+.fc-clock {
+    font-size: 5rem;
+    font-weight: 700;
+    text-align: center;
+    color: #fff;
+    line-height: 1;
+}
+</style>
+
+<div class="fc-wrap">
+    {# ── Header ── #}
+    <div class="fc-header">
+        <div class="fc-header-left">
+            <div class="fc-day-name">{{ content.today_date }}</div>
+            <div class="fc-event-count">{{ content.count }} event{{ "s" if content.count != 1 else "" }} today</div>
+        </div>
+        <div class="fc-clock live-clock">--:--</div>
+    </div>
+
+    {# ── Body ── #}
+    <div class="fc-body">
+
+        {# ── Today's Events ── #}
+        <div class="fc-events-col">
+            <div class="fc-day-label">📅 Today's Schedule</div>
+
+            {% if content.today_events %}
+                {% set now_time = content.now_time %}
+
+                {% for event in content.today_events %}
+                <div class="fc-event-card {% if content.current_event and event.summary == content.current_event.summary %}now{% endif %}">
+                    <div class="fc-event-bar" style="background: {{ event.color }};"></div>
+                    <div class="fc-event-body">
+                        <div class="fc-event-time">{{ event.time }}</div>
+                        <div class="fc-event-name">{{ event.summary }}</div>
+                        {% if event.location %}
+                        <div class="fc-event-loc">📍 {{ event.location }}</div>
+                        {% endif %}
+                        {% if content.current_event and event.summary == content.current_event.summary %}
+                        <div class="fc-event-badge">⟳ Happening Now</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+            {% else %}
+                <div class="fc-empty-state">
+                    <div class="fc-empty-icon">🎉</div>
+                    <div class="fc-empty-text">Clear day — enjoy it!</div>
+                </div>
+            {% endif %}
+        </div>
+
+        {# ── Sidebar ── #}
+        <div class="fc-sidebar">
+
+            {# Now / Next #}
+            {% if content.current_event %}
+            <div class="fc-now-block">
+                <div class="fc-now-label">⟳ Now</div>
+                <div class="fc-now-event">{{ content.current_event.summary }}</div>
+                {% if content.current_event.time %}<div class="fc-now-time">ends {{ content.current_event.time }}</div>{% endif %}
+            </div>
+            {% elif content.next_event %}
+            <div class="fc-now-block" style="background: rgba(90,147,103,0.1); border-color: rgba(90,147,103,0.3);">
+                <div class="fc-now-label" style="color: #5a9367;">✓ Free Until</div>
+                <div class="fc-now-free">{{ content.next_event.summary }}</div>
+                {% if content.next_event.time %}<div class="fc-now-time">{{ content.next_event.time }}</div>{% endif %}
+            </div>
+            {% else %}
+            <div class="fc-now-block" style="background: rgba(90,147,103,0.1); border-color: rgba(90,147,103,0.3);">
+                <div class="fc-now-label" style="color: #5a9367;">✓ Free</div>
+                <div class="fc-now-free">Wide open — protect it!</div>
+            </div>
+            {% endif %}
+
+            {# Up Next #}
+            {% if content.next_event %}
+            <div class="fc-sidebar-section fc-next-block">
+                <div class="fc-sidebar-title">⬆ Up Next</div>
+                <div class="fc-next-item">
+                    <div class="fc-next-time">{{ content.next_event.time }}</div>
+                    <div class="fc-next-name">{{ content.next_event.summary }}</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Tomorrow preview #}
+            {% if content.tomorrow_events %}
+            <div class="fc-sidebar-section fc-tomorrow-block">
+                <div class="fc-sidebar-title">📆 Tomorrow</div>
+                {% for event in content.tomorrow_events[:4] %}
+                <div class="fc-tomorrow-event">
+                    <div class="fc-tomorrow-time">{{ event.time }}</div>
+                    <div>{{ event.summary }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function updateClock() {
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        document.querySelectorAll('.live-clock').forEach(el => el.textContent = time);
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+})();
+</script>

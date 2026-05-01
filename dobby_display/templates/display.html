@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dobby Display</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        // Force EngineIO protocol version 4
+        window.io = window.io || {};
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        body.message-mode header { display: none; }
+        body.message-mode .content { height: 100vh; }
+
+        h1 {
+            font-size: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .mode-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .timestamp {
+            font-size: 0.7rem;
+            opacity: 0.5;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .mode-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.7);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+        }
+
+        .mode-btn:focus {
+            outline: 2px solid #ffd700;
+            outline-offset: 2px;
+        }
+
+        .content {
+            flex: 1;
+            overflow: auto;
+        }
+
+        /* Dashboard Mode */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            opacity: 0.9;
+        }
+
+        .stat {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        /* Run Display */
+        .run-display {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .run-card {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .run-stat {
+            font-size: 3rem;
+            font-weight: 700;
+        }
+
+        .run-label {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        .run-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+        }
+
+        /* Meals Display */
+        .meals-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .meal-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .meal-day {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .meal-item {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .meal-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Routine Display */
+        .routine {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .routine-step {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px 30px;
+            margin-bottom: 15px;
+        }
+
+        .routine-number {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .routine-text {
+            font-size: 1.3rem;
+        }
+
+        /* Custom Content */
+        .custom-content {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .custom-title {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .custom-body {
+            font-size: 1.5rem;
+            line-height: 1.8;
+            opacity: 0.9;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            h1 { font-size: 1.2rem; }
+            .stat { font-size: 2rem; }
+            .run-stat { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body class="{{ state.mode }}-mode">
+    <div class="container">
+        <header>
+            <h1>
+                🧦 Dobby Display
+                <span class="mode-badge">{{ state.mode }}</span>
+                <a href="/config" style="font-size:0.8rem;color:#ffd700;margin-left:10px;">⚙️</a>
+            </h1>
+            <div class="mode-toggle">
+                <button class="mode-btn" onclick="switchMode('quickglance')" title="Family (F)">👨‍👩‍👧‍👦 Family</button>
+                <button class="mode-btn" onclick="switchMode('family-calendar')" title="Calendar">📅 Calendar</button>
+                <button class="mode-btn" onclick="switchMode('work')" title="Work (W)">💼 Work</button>
+            </div>
+            <div class="timestamp" id="friendly-updated"></div>
+        </header>
+
+        <div class="content">
+            {% if state.mode == 'dashboard' %}
+                {% include 'dashboard.html' %}
+            {% elif state.mode == 'run' %}
+                {% include 'run.html' %}
+            {% elif state.mode == 'meals' %}
+                {% include 'meals.html' %}
+            {% elif state.mode == 'routine' %}
+                {% include 'routine.html' %}
+            {% elif state.mode == 'weather' %}
+                {% include 'weather.html' %}
+            {% elif state.mode == 'celebration' %}
+                {% include 'celebration.html' %}
+            {% elif state.mode == 'countdown' %}
+                {% include 'countdown.html' %}
+            {% elif state.mode == 'quickglance' %}
+                {% include 'quickglance.html' %}
+            {% elif state.mode == 'work' %}
+                {% include 'work.html' %}
+            {% elif state.mode == 'family-calendar' %}
+                {% include 'family-calendar.html' %}
+            {% elif state.mode == 'message' %}
+                {% include 'message.html' %}
+            {% elif state.mode == 'image-message' %}
+                {% include 'image-message.html' %}
+            {% elif state.mode == 'verse' %}
+                {% include 'verse.html' %}
+            {% elif state.mode == 'alert' %}
+                {% include 'alert.html' %}
+            {% else %}
+                {% include 'custom.html' %}
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+
+        // Format timestamp friendily
+        function formatFriendlyTime(isoString) {
+            if (!isoString) return '';
+            try {
+                const date = new Date(isoString);
+                return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            } catch { return ''; }
+        }
+        document.getElementById('friendly-updated').textContent = 'Updated ' + formatFriendlyTime('{{ state.updated }}');
+
+        // Switch display mode function
+        function switchMode(mode) {
+            console.log('Switching to mode:', mode);
+            fetch('/api/mode/' + mode, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        localStorage.setItem('dobby_display_mode', mode);
+                        localStorage.setItem('dobby_display_mode_ts', Date.now().toString());
+                        location.reload();
+                    }
+                })
+                .catch(err => {
+                    console.error('Mode switch failed:', err);
+                    location.reload();
+                });
+        }
+
+        // Keyboard shortcuts for mode switching
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            // W = Work, F = Family/Quickglance
+            if (e.key === 'w' || e.key === 'W') {
+                switchMode('work');
+            }
+            if (e.key === 'f' || e.key === 'F') {
+                switchMode('quickglance');
+            }
+        });
+
+        // Restore mode from localStorage on load
+        // If user manually selected a mode but server reverted, re-switch
+        (function() {
+            const savedMode = localStorage.getItem('dobby_display_mode');
+            console.log('Saved display mode:', savedMode, 'current server mode:', currentMode);
+            if (savedMode && savedMode !== currentMode) {
+                // Server mode doesn't match user's choice - this can happen if
+                // a background fetch_data.py pushed quickglance while user wanted work
+                // Only auto-correct if the saved mode was set recently (within 5 min)
+                const savedAt = parseInt(localStorage.getItem('dobby_display_mode_ts') || '0');
+                const elapsed = Date.now() - savedAt;
+                if (savedAt && elapsed < 300000) {
+                    console.log('Mode mismatch detected, re-switching to', savedMode);
+                    fetch('/api/mode/' + savedMode, { method: 'POST' })
+                        .then(r => r.json())
+                        .then(data => { if (data.success) location.reload(); });
+                } else {
+                    // Stale preference, clear it
+                    localStorage.removeItem('dobby_display_mode');
+                    localStorage.removeItem('dobby_display_mode_ts');
+                }
+            }
+        })();
+
+        // ========== TTS MESSAGE QUEUE SYSTEM ==========
+        // Proper sequential processing with deduplication using Web Audio API
+        // FIX: Use a single source of truth for TTS to prevent duplicates
+        
+        let ttsQueue = [];
+        let ttsProcessing = false;  // True when actively playing audio
+        let lastProcessedTime = 0;  // Track when we last processed a message
+        
+        // Global deduplication: track the last message ID that was played
+        // This survives across queue processing but resets on page reload
+        let lastPlayedMessageId = null;
+        let lastPlayedTimestamp = 0;
+        const TTS_COOLDOWN_MS = 5000;  // 5 second cooldown between same messages
+        
+        // Generate unique message ID from content - this is the SOURCE OF TRUTH
+        function getMessageId(content, mode, updated) {
+            // Use content hash for deduplication - same content = same ID
+            const speakText = content?.speak || content?.message || '';
+            const sound = content?.sound || '';
+            // Don't include 'updated' timestamp in ID - we want same message to dedupe
+            // But include mode to differentiate message types
+            const id = `${mode}-${speakText}-${sound}`.replace(/\s+/g, '_').substring(0, 80);
+            return id || null;
+        }
+
+        // SessionStorage key for tracking played messages
+        function getPlayedKey(messageId) {
+            return 'dobby_tts_played_' + messageId;
+        }
+
+        // Check if this exact message has already been played in this session
+        function hasMessageBeenPlayed(messageId) {
+            if (!messageId) return false;
+            try {
+                return sessionStorage.getItem(getPlayedKey(messageId)) === 'true';
+            } catch (e) {
+                console.warn('sessionStorage unavailable:', e);
+                return false;
+            }
+        }
+
+        // Mark message as played in sessionStorage
+        function markMessagePlayed(messageId) {
+            if (!messageId) return;
+            try {
+                sessionStorage.setItem(getPlayedKey(messageId), 'true');
+            } catch (e) {
+                console.warn('Failed to mark message as played:', e);
+            }
+        }
+
+        // Web Audio API context for more reliable playback
+        let audioContext = null;
+        
+        function getAudioContext() {
+            if (!audioContext) {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Web Audio API not available:', e);
+                }
+            }
+            return audioContext;
+        }
+        
+        // Main speak function - SINGLE ENTRY POINT for all TTS
+        // This is the ONLY function that should trigger audio
+        function speak(text, sound, messageId) {
+            // Early validation
+            if (!text && !sound) {
+                console.log('TTS: No text or sound provided, skipping');
+                return;
+            }
+            
+            // DEDUPLICATION CHECK - this is the key fix!
+            const now = Date.now();
+            
+            // Check 1: Same message ID as last played (within cooldown)
+            if (messageId && messageId === lastPlayedMessageId) {
+                if (now - lastPlayedTimestamp < TTS_COOLDOWN_MS) {
+                    console.log('TTS: Skipping - same message within cooldown:', messageId);
+                    return;
+                }
+            }
+            
+            // Check 2: SessionStorage - has this exact message been played this session?
+            if (messageId && hasMessageBeenPlayed(messageId)) {
+                console.log('TTS: Skipping - message already played in session:', messageId);
+                return;
+            }
+            
+            // Passed all checks - queue the message
+            console.log('TTS: Queueing:', text, 'sound:', sound, 'id:', messageId);
+            sendDisplayLog('TTS queued: ' + (messageId || 'unknown'));
+            
+            // Mark as played immediately to prevent race conditions
+            if (messageId) {
+                lastPlayedMessageId = messageId;
+                lastPlayedTimestamp = now;
+                markMessagePlayed(messageId);
+            }
+            
+            // Add to queue
+            ttsQueue.push({ text, sound, messageId, queuedAt: now });
+            
+            // Process queue
+            processTtsQueue();
+        }
+        
+        // Process queue sequentially - one message at a time
+        function processTtsQueue() {
+            // Already processing or nothing in queue - wait
+            if (ttsProcessing || ttsQueue.length === 0) return;
+            
+            // Rate limit: wait at least 300ms between messages
+            const now = Date.now();
+            if (now - lastProcessedTime < 300 && ttsQueue.length > 1) {
+                setTimeout(processTtsQueue, 300 - (now - lastProcessedTime));
+                return;
+            }
+            
+            const item = ttsQueue.shift();
+            const text = item.text;
+            const sound = item.sound;
+            const messageId = item.messageId;
+            
+            // If nothing to play, process next
+            if (!text && !sound) {
+                lastProcessedTime = now;
+                processTtsQueue();
+                return;
+            }
+            
+            ttsProcessing = true;
+            lastProcessedTime = now;
+            console.log('TTS: Processing, queue remaining:', ttsQueue.length);
+            
+            // Use Web Audio API for more reliable playback
+            const playWithWebAudio = (url) => {
+                return new Promise((resolve, reject) => {
+                    const ctx = getAudioContext();
+                    if (!ctx) {
+                        // Fallback to HTML5 Audio
+                        const audio = new Audio(url);
+                        audio.play().then(resolve).catch(reject);
+                        return;
+                    }
+                    
+                    fetch(url)
+                        .then(response => response.arrayBuffer())
+                        .then(arrayBuffer => ctx.decodeAudioData(arrayBuffer))
+                        .then(audioBuffer => {
+                            const source = ctx.createBufferSource();
+                            source.buffer = audioBuffer;
+                            source.connect(ctx.destination);
+                            source.onended = () => resolve();
+                            source.start(0);
+                        })
+                        .catch(() => {
+                            // Fallback to HTML5 Audio
+                            const audio = new Audio(url);
+                            audio.play().then(resolve).catch(reject);
+                        });
+                });
+            };
+            
+            // Create a promise-based audio player
+            const playAudio = () => {
+                return new Promise((resolve) => {
+                    // First try native Android to play sound file
+                    if (sound) {
+                        const soundUrl = '/static/' + sound + '.wav';
+                        console.log('TTS: Trying sound:', soundUrl);
+                        
+                        // Try native Android first (for Fire TV app)
+                        if (typeof Dobby !== 'undefined' && Dobby) {
+                            try {
+                                Dobby.playSound(soundUrl);
+                                if (text) Dobby.speak(text);
+                                // Give audio time to finish - increased from 2500ms to 15s to prevent cutoff
+                                setTimeout(resolve, 15000);
+                                return;
+                            } catch (e) {
+                                console.log('TTS: Native sound failed:', e);
+                            }
+                        }
+                        
+                        // Try Web Audio API first, then fallback to HTML5
+                        playWithWebAudio(soundUrl)
+                            .then(() => {
+                                console.log('TTS: Sound finished');
+                                resolve();
+                            })
+                            .catch(() => {
+                                // Try .m4a fallback
+                                const m4aUrl = '/static/' + sound + '.m4a';
+                                playWithWebAudio(m4aUrl)
+                                    .then(() => resolve())
+                                    .catch(() => {
+                                        console.log('TTS: All audio methods failed');
+                                        resolve();  // Continue anyway
+                                    });
+                            });
+                        return;
+                    }
+                    
+                    // Try native Android TTS
+                    if (typeof Dobby !== 'undefined' && Dobby && text) {
+                        console.log('TTS: Using Android native TTS');
+                        try {
+                            Dobby.speak(text);
+                            // Give TTS time to finish - increased from 3000ms to 15s to prevent cutoff
+                            setTimeout(resolve, 15000);
+                            return;
+                        } catch (e) {
+                            console.log('TTS: Dobby TTS failed, falling back:', e);
+                        }
+                    }
+
+                    // Fallback to browser speechSynthesis
+                    if ('speechSynthesis' in window && text) {
+                        // Cancel any pending speech first
+                        window.speechSynthesis.cancel();
+                        
+                        const msg = new SpeechSynthesisUtterance(text);
+                        msg.rate = 1;
+                        msg.pitch = 1;
+                        msg.onend = () => {
+                            console.log('TTS: Speech finished');
+                            resolve();
+                        };
+                        msg.onerror = (e) => {
+                            console.log('TTS: Speech error:', e);
+                            resolve();
+                        };
+                        window.speechSynthesis.speak(msg);
+                    } else {
+                        console.log('TTS: No audio method available');
+                        resolve();
+                    }
+                });
+            };
+            
+            // Execute and wait for completion
+            playAudio().then(() => {
+                console.log('TTS: Item complete');
+                ttsProcessing = false;
+                // Small delay before processing next item
+                setTimeout(processTtsQueue, 300);
+            });
+        }
+        
+        // Cancel any pending TTS (useful when we want to interrupt)
+        function cancelTts() {
+            ttsQueue = [];
+            ttsProcessing = false;
+            if (typeof window !== 'undefined' && window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+            console.log('TTS: Queue cleared');
+        }
+
+        // Auto-refresh every 10 seconds to check for updates (skip in message mode unless it's a countdown)
+        let lastUpdated = '{{ state.updated }}';
+        const currentMode = '{{ state.mode }}';
+        const isMessageMode = '{{ state.mode }}' === 'message';
+        const hasAutoDismiss = {{ state.content.auto_dismiss|default(0) }};
+        const isSticky = {{ 'true' if state.content.sticky else 'false' }};
+
+        // ========== LOCALSTORAGE CACHE FOR QUICKGLANCE ==========
+        const CACHE_KEY = 'dobby_quickglance_cache';
+        const CACHE_MODE_KEY = 'dobby_cache_mode';
+        const CACHE_TIMESTAMP_KEY = 'dobby_cache_timestamp';
+
+        // Save quickglance data to localStorage
+        function cacheQuickglance(data) {
+            try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                localStorage.setItem(CACHE_MODE_KEY, 'quickglance');
+                localStorage.setItem(CACHE_TIMESTAMP_KEY, new Date().toISOString());
+                console.log('Cached quickglance data to localStorage');
+            } catch (e) {
+                console.error('Failed to cache:', e);
+            }
+        }
+
+        // Get cached quickglance data
+        function getCachedQuickglance() {
+            try {
+                const cached = localStorage.getItem(CACHE_KEY);
+                const mode = localStorage.getItem(CACHE_MODE_KEY);
+                if (cached && mode === 'quickglance') {
+                    return JSON.parse(cached);
+                }
+            } catch (e) {
+                console.error('Failed to read cache:', e);
+            }
+            return null;
+        }
+
+        // Update quickglance DOM elements in-place (no reload)
+        function updateQuickglanceDOM(data) {
+            if (!data) return;
+
+            // Time and date
+            const timeEls = document.querySelectorAll('.live-time');
+            const dateEls = document.querySelectorAll('.live-date');
+            if (data.time && timeEls.length) timeEls.forEach(el => el.textContent = data.time);
+            if (data.date && dateEls.length) dateEls.forEach(el => el.textContent = data.date);
+
+            // Weather - find by content patterns
+            const weatherIcon = document.querySelector('.qg-weather-icon');
+            const weatherTemp = document.querySelector('.qg-weather-temp');
+            const weatherHighlow = document.querySelector('.qg-weather-highlow');
+            if (weatherIcon && data.weather_icon) weatherIcon.textContent = data.weather_icon;
+            if (weatherTemp && data.weather_temp) weatherTemp.textContent = data.weather_temp;
+            if (weatherHighlow && data.weather_high && data.weather_low) {
+                weatherHighlow.textContent = `${data.weather_high}° / ${data.weather_low}°`;
+            }
+
+            // Current event
+            const currentEventName = document.querySelector('.qg-current-event .qg-event-name');
+            const currentEventTime = document.querySelector('.qg-current-event .qg-event-time');
+            if (currentEventName) currentEventName.textContent = data.current_event || 'Free Time';
+            if (currentEventTime && data.current_event_time) {
+                currentEventTime.textContent = `ends ${data.current_event_time}`;
+                currentEventTime.style.display = '';
+            } else if (currentEventTime) {
+                currentEventTime.style.display = 'none';
+            }
+
+            // Next event
+            const nextEventName = document.querySelector('.qg-next-event .qg-event-name');
+            const nextEventTime = document.querySelector('.qg-next-event .qg-event-time');
+            if (nextEventName) nextEventName.textContent = data.next_event || 'Nothing scheduled';
+            if (nextEventTime && data.next_event_time) {
+                nextEventTime.textContent = `starts ${data.next_event_time}`;
+                nextEventTime.style.display = '';
+            } else if (nextEventTime) {
+                nextEventTime.style.display = 'none';
+            }
+
+            // Dinner
+            const dinnerText = document.querySelector('.qg-dinner-text');
+            if (dinnerText) dinnerText.textContent = data.dinner || 'TBD';
+
+            // Countdown
+            const countdownEl = document.querySelector('.qg-countdown');
+            if (countdownEl) {
+                let countdownText = '';
+                if (data.countdown) {
+                    countdownText = data.countdown;
+                    if (data.countdown_label) countdownText += ` (${data.countdown_label})`;
+                }
+                countdownEl.textContent = countdownText;
+
+                // Update urgency class
+                countdownEl.classList.remove('warning', 'critical');
+                if (data.countdown_urgency === 'urgent') countdownEl.classList.add('warning');
+                if (data.countdown_urgency === 'critical') countdownEl.classList.add('critical');
+            }
+
+            // Tasks - rebuild the list
+            const tasksList = document.querySelector('.qg-tasks-list');
+            if (tasksList && data.tasks) {
+                tasksList.innerHTML = data.tasks.slice(0, 5).map(task =>
+                    `<div class="task-item">
+                        <span class="task-name">${task.name || ''}</span>
+                        ${task.due ? `<span class="task-due">${task.due}</span>` : ''}
+                    </div>`
+                ).join('') || 'No tasks';
+            }
+
+            console.log('Updated quickglance DOM in-place');
+        }
+
+        // Cache current quickglance content on page load (from server-rendered HTML)
+        {% if state.mode == 'quickglance' and state.content %}
+        cacheQuickglance({{ state.content | tojson }});
+        {% endif %}
+
+        // Check for cached data on load - but we already have server data, so just log
+        const cached = getCachedQuickglance();
+        console.log('Cached quickglance available:', cached ? 'yes' : 'no');
+
+        const sendDisplayLog = (message) => {
+            fetch('/api/log', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({log: message})
+            }).catch(() => console.warn('Display log failed'));
+        };
+
+
+
+        const initialServerMode = '{{ state.mode }}';
+        const initialServerUpdated = '{{ state.updated }}';
+        let lastServerState = { mode: initialServerMode, updated: initialServerUpdated };
+
+        // Socket.IO WebSocket connection for real-time updates
+        let socketConnected = false;
+        // Use existing lastSpokenText from line 395, don't redeclare
+        try {
+            const socket = io();
+
+            socket.on('connect', () => {
+                console.log('Connected via WebSocket');
+                socketConnected = true;
+                sendDisplayLog('WebSocket connected');
+                socket.emit('request_status');
+            });
+
+            socket.on('state_update', (data) => {
+                console.log('WebSocket: Received state update:', data.mode, 'current mode:', currentMode);
+                
+                // Auto-refresh page when receiving new data (for work mode especially)
+                if (data.updated !== lastUpdated) {
+                    console.log('WebSocket: New data detected, reloading...');
+                    sendDisplayLog('WebSocket reload - new data detected');
+                    location.reload();
+                    return;
+                }
+
+                // FIX: Let the speak() function handle all deduplication
+                // The function has its own cooldown and sessionStorage tracking
+
+                // Check if mode changed
+                if (data.mode !== currentMode) {
+                    console.log('WebSocket: Mode changed from', currentMode, 'to', data.mode);
+
+                    // Cache quickglance before switching away
+                    if (currentMode === 'quickglance' && data.content) {
+                        cacheQuickglance(data.content);
+                    }
+
+                    if (data.updated !== lastUpdated) {
+                        lastUpdated = data.updated;
+                        document.getElementById('friendly-updated').textContent = 'Updated ' + formatFriendlyTime(data.updated);
+                    }
+
+                    // For message mode, just trigger TTS (speak() handles dedup)
+                    if (data.mode === 'message') {
+                        sendDisplayLog('WebSocket message received');
+                        const soundFile = (data.content && data.content.sound) ? data.content.sound : null;
+                        const speakText = (data.content && data.content.speak) ? data.content.speak : (data.speak || null);
+                        const msgId = getMessageId(data.content, data.mode, data.updated);
+                        // Just call speak - it handles deduplication internally
+                        if (speakText) {
+                            speak(speakText, soundFile, msgId);
+                        }
+                        return;
+                    }
+
+                    // Check for speech content in other mode changes
+                    let speakText = null;
+                    if (data.content && data.content.speak) {
+                        speakText = data.content.speak;
+                    } else if (data.speak) {
+                        speakText = data.speak;
+                    }
+
+                    if (speakText) {
+                        const soundFile = data.content ? data.content.sound : null;
+                        const msgId = getMessageId(data.content, data.mode, data.updated);
+                        speak(speakText, soundFile, msgId);
+                    }
+                }
+
+                // Same mode - handle updates
+                if (data.updated !== lastUpdated) {
+                    lastUpdated = data.updated;
+                    document.getElementById('friendly-updated').textContent = 'Updated ' + formatFriendlyTime(data.updated);
+
+                    // If staying in quickglance mode, update DOM in-place (no reload)
+                    if (data.mode === 'quickglance' && data.content) {
+                        console.log('WebSocket: Quickglance update - updating DOM in-place');
+                        cacheQuickglance(data.content);
+
+                        // Check for speech but don't reload
+                        let speakText = null;
+                        if (data.content && data.content.speak) {
+                            speakText = data.content.speak;
+                        } else if (data.speak) {
+                            speakText = data.speak;
+                        }
+
+                        if (speakText) {
+                            const msgId = getMessageId(data.content, data.mode, data.updated);
+                            speak(speakText, null, msgId);
+                        }
+
+                        // Update DOM elements
+                        updateQuickglanceDOM(data.content);
+                        return;
+                    }
+
+                    // For message mode
+                    if (data.mode === 'message') {
+                        const soundFile = (data.content && data.content.sound) ? data.content.sound : null;
+                        const speakText = (data.content && data.content.speak) ? data.content.speak : (data.speak || null);
+                        const msgId = getMessageId(data.content, data.mode, data.updated);
+                        if (speakText) {
+                            speak(speakText, soundFile, msgId);
+                        }
+                        return;
+                    }
+
+                    // For other modes - check for speech
+                    let speakText = null;
+                    if (data.content && data.content.speak) {
+                        speakText = data.content.speak;
+                    } else if (data.speak) {
+                        speakText = data.speak;
+                    }
+
+                    if (speakText) {
+                        const soundFile = data.content ? data.content.sound : null;
+                        const msgId = getMessageId(data.content, data.mode, data.updated);
+                        speak(speakText, soundFile, msgId);
+                    }
+                }
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from WebSocket');
+                socketConnected = false;
+                sendDisplayLog('WebSocket disconnected');
+            });
+        } catch (e) {
+            console.log('WebSocket not available, falling back to polling');
+        }
+
+        // Don't auto-refresh if we have an active message with auto-dismiss or sticky
+        if (isMessageMode && (hasAutoDismiss > 0 || isSticky)) {
+            // Just update timestamp, don't reload
+            setInterval(() => {
+                fetch('/api/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        document.getElementById('friendly-updated').textContent = 'Updated ' + formatFriendlyTime(data.updated);
+                    })
+                    .catch(console.error);
+            }, 60000);
+        } else if (!isMessageMode) {
+            // Polling only - NO TTS triggers here!
+            // WebSocket handles TTS - polling just updates data
+            // This prevents duplicate TTS when both fire
+            setInterval(() => {
+                fetch('/api/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.updated !== lastUpdated) {
+                            lastUpdated = data.updated;
+                            document.getElementById('friendly-updated').textContent = 'Updated ' + formatFriendlyTime(data.updated);
+
+                            // Smart update: if staying in quickglance mode, update DOM in-place
+                            if (data.mode === 'quickglance' && data.content) {
+                                console.log('Polling: quickglance update - updating DOM in-place');
+                                cacheQuickglance(data.content);
+                                // Update DOM only - NO TTS here (WebSocket handles that)
+                                updateQuickglanceDOM(data.content);
+                                return;
+                            }
+
+                            // For other modes - just log, no TTS, no reload
+                            // The WebSocket will handle any mode changes with TTS
+                            console.log('Polling: State changed but not triggering TTS (WebSocket handles that)');
+                        }
+                    })
+                    .catch(console.error);
+            }, 60000);
+        }
+        
+        // Refresh data when page loads (back button pressed)
+        fetch('/api/refresh', {method: 'POST'}).then(r => r.json()).then(d => {
+            if (d.success) console.log('Data refreshed');
+        }).catch(e => console.log('Refresh failed:', e));
+    </script>
+</body>
+</html>
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                pollForServerMessage();
+            }
+        });
+
+        function pollForServerMessage() {
+            if (socketConnected) {
+                return;
+            }
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.mode === 'message' && data.updated !== lastServerState.updated && currentMode !== 'message') {
+                        console.log('Poll detected message while disconnected, reloading...');
+                        sendDisplayLog('Poll reload due to cached message');
+                        location.reload();
+                        return;
+                    }
+                    lastServerState = { mode: data.mode, updated: data.updated };
+                })
+                .catch(console.error);
+        }
+
+        setInterval(pollForServerMessage, 10000);
+
