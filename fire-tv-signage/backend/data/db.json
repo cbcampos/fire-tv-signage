@@ -2,11 +2,14 @@
   "pairingCodes": {
     "ABC123": {
       "code": "ABC123",
-      "paired": false,
+      "paired": true,
       "seenAt": "2026-05-05T16:03:30.161Z",
       "deviceId": "test123",
       "name": "test",
-      "lastSeenAt": "2026-05-05T16:03:30.161Z"
+      "lastSeenAt": "2026-05-05T16:03:30.161Z",
+      "label": "Fire TV Signage",
+      "token": "Ua2XFutawBrcrssnXn1O3kqt05d9Nb0b",
+      "approvedAt": "2026-05-05T17:58:27.592Z"
     },
     "2GU9G6": {
       "code": "2GU9G6",
@@ -246,7 +249,7 @@
       ],
       "createdAt": "2026-05-05T17:34:57.069Z",
       "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T17:48:39.763Z"
+      "lastSeenAt": "2026-05-05T18:03:09.154Z"
     }
   }
 }

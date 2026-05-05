@@ -1,0 +1,12 @@
+# Build outputs
+app/build/
+build/
+.gradle/
+gradle/
+
+# Local config (contains SDK path)
+local.properties
+
+# Keystore / signing
+*.keystore
+*.jks
