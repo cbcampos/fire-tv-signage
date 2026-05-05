@@ -27,7 +27,16 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith("/uploads/")) {
       const uploadName = decodeURIComponent(url.pathname.replace(/^\/uploads\//, ""));
-      serveFile(res, path.join(UPLOAD_DIR, uploadName));
+      const filePath = path.join(UPLOAD_DIR, uploadName);
+      const rangeHeader = req.headers["range"];
+      if (rangeHeader) {
+        const parts = rangeHeader.replace(/^bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : undefined;
+        serveFile(res, filePath, start, end);
+      } else {
+        serveFile(res, filePath);
+      }
       return;
     }
     serveStatic(res, url.pathname);
@@ -90,22 +99,62 @@ async function routeApi(req, res, url) {
     return;
   }
 
-  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "devices" && parts[3]) {
+  // ── Library ────────────────────────────────────────────────────────────────
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library") {
+    const body = await readJson(req);
+    if (!body.dataUrl) { sendJson(res, 400, { error: "dataUrl required" }); return; }
+    const image = saveDataUrlImage(body.name || "library-item", body.dataUrl);
+    const item = {
+      id: image.id,
+      name: image.name,
+      type: image.isVideo ? "video" : "image",
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      path: image.path,
+      size: fs.statSync(path.join(UPLOAD_DIR, `${image.id}.${image.path.split(".").pop()}`)).size,
+      addedAt: new Date().toISOString()
+    };
+    db.library.push(item);
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "library" && parts[3]) {
+    const id = parts[3];
+    const idx = db.library.findIndex((i) => i.id === id);
+    if (idx === -1) { sendJson(res, 404, { error: "Not found" }); return; }
+    const item = db.library[idx];
+    // Remove actual file
+    try {
+      const filePath = path.join(UPLOAD_DIR, path.basename(item.path));
+      if (existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch {}
+    db.library.splice(idx, 1);
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "GET" && parts[1] === "admin" && parts[2] === "library" && parts[3]) {
+    const item = db.library.find((i) => i.id === parts[3]);
+    if (!item) { sendJson(res, 404, { error: "Not found" }); return; }
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  // ── Health ────────────────────────────────────────────────────────────────
+  if (req.method === "GET" && parts[1] === "api" && parts[2] === "health") {
+    sendJson(res, 200, { ok: true, devices: Object.keys(db.devices).length, pendingPairings: Object.keys(db.pairingCodes).filter((k) => !db.pairingCodes[k].paired).length });
+    return;
+  }
+
+  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && !parts[4]) {
     const body = await readJson(req);
     const device = db.devices[parts[3]];
-    if (!device) {
-      sendJson(res, 404, { error: "Device not found." });
-      return;
-    }
-    if (body.label !== undefined) {
-      device.label = String(body.label).trim() || device.label;
-    }
-    if (body.location !== undefined) {
-      device.location = String(body.location).trim();
-    }
-    if (body.delaySeconds !== undefined) {
-      device.delaySeconds = clamp(Number(body.delaySeconds), 2, 3600);
-    }
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    if (body.label !== undefined) device.label = String(body.label).trim() || device.label;
+    if (body.location !== undefined) device.location = String(body.location).trim();
+    if (body.delaySeconds !== undefined) device.delaySeconds = clamp(Number(body.delaySeconds), 2, 3600);
     saveDb();
     sendJson(res, 200, { ok: true, device });
     return;
@@ -153,8 +202,25 @@ async function routeApi(req, res, url) {
     if (!image) { sendJson(res, 404, { error: "Image not found." }); return; }
     const body = await readJson(req);
     if (body.name !== undefined) image.name = String(body.name).trim().slice(0, 120) || image.name;
+    if (body.delaySeconds !== undefined) image.delaySeconds = body.delaySeconds === null ? null : clamp(Number(body.delaySeconds), 2, 3600);
+    if (body.order !== undefined && Array.isArray(body.order)) {
+      const reorderMap = new Map(body.order.map((id, i) => [id, i]));
+      device.images.sort((a, b) => (reorderMap.get(a.id) ?? 999) - (reorderMap.get(b.id) ?? 999));
+    }
     saveDb();
     sendJson(res, 200, { ok: true, image });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "images" && parts[5] === "reorder") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req);
+    if (!Array.isArray(body.order)) { sendJson(res, 400, { error: "order must be an array of image ids" }); return; }
+    const reorderMap = new Map(body.order.map((id, i) => [id, i]));
+    device.images.sort((a, b) => (reorderMap.get(a.id) ?? 999) - (reorderMap.get(b.id) ?? 999));
+    saveDb();
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -252,7 +318,8 @@ function adminState(req) {
       .filter((pairing) => !pairing.paired)
       .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))),
     devices: Object.values(db.devices)
-      .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt)))
+      .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))),
+    library: db.library
   };
 }
 
@@ -276,15 +343,18 @@ function saveDataUrlImage(name, dataUrl) {
     mime,
     path: `/uploads/${filename}`,
     isVideo,
+    delaySeconds: null,
     createdAt: new Date().toISOString()
   };
 }
 
 function loadDb() {
   try {
-    return JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+    const data = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+    if (!data.library) data.library = [];
+    return data;
   } catch {
-    return { pairingCodes: {}, devices: {} };
+    return { pairingCodes: {}, devices: {}, library: [] };
   }
 }
 
@@ -347,7 +417,7 @@ function serveStatic(res, requestPath) {
   serveFile(res, path.join(PUBLIC_DIR, decodeURIComponent(clean)));
 }
 
-function serveFile(res, filePath) {
+function serveFile(res, filePath, start, end) {
   const resolved = path.resolve(filePath);
   const allowed = [PUBLIC_DIR, UPLOAD_DIR].some((root) => resolved.startsWith(path.resolve(root)));
   if (!allowed || !fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
@@ -355,6 +425,7 @@ function serveFile(res, filePath) {
     res.end("Not found");
     return;
   }
+  const stat = fs.statSync(resolved);
   const ext = path.extname(resolved).toLowerCase();
   const type = {
     ".html": "text/html; charset=utf-8",
@@ -366,6 +437,18 @@ function serveFile(res, filePath) {
     ".webp": "image/webp",
     ".gif": "image/gif"
   }[ext] || "application/octet-stream";
-  res.writeHead(200, { "content-type": type });
-  fs.createReadStream(resolved).pipe(res);
+
+  if (start !== undefined && end !== undefined) {
+    const length = end - start + 1;
+    res.writeHead(206, {
+      "Content-Type": type,
+      "Accept-Ranges": "bytes",
+      "Content-Length": length,
+      "Content-Range": `bytes ${start}-${end}/${stat.size}`
+    });
+    fs.createReadStream(resolved, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": stat.size });
+    fs.createReadStream(resolved).pipe(res);
+  }
 }

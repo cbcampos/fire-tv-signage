@@ -1,62 +1,106 @@
 ---
-description: Upload images, remove images, clear playlists, view current content on devices
+description: Upload, reorder, set per-slide delay, and clear content on paired devices
 priority: high
 links:
   - SKILL
+  - fire-tv-signage.push
   - fire-tv-signage.devices
-  - fire-tv-signage.manage
+  - fire-tv-signage.video
 ---
 
-# fire-tv-signage.content
+# fire-tv-signage.content — Manage Device Content
 
-Manage display content (images) on paired Fire TV devices. The backend stores images locally and the Fire TV polls every 5 seconds for playlist updates.
-
-## Upload Images
-
-### Upload one or more images to a device
+## View Playlist
 ```bash
-cd ~/.openclaw/workspace/fire-tv-signage/backend && npm run signage -- upload DEVICE_ID /path/to/image.jpg
+signage show DEVICE_ID
+```
+Shows: image list with names, types (IMAGE/VIDEO), delay overrides, display order.
+
+## Upload Images or Videos
+```bash
+# Image
+signage push DEVICE_ID /path/to/image.jpg
+
+# Video (auto-restructured for Fire TV)
+signage push DEVICE_ID /path/to/video.mp4
+
+# Multiple at once
+signage push DEVICE_ID /path/img1.jpg /path/img2.png /path/video.mp4
 ```
 
-Multiple images can be queued — they display in order, cycling continuously.
+## Reorder Playlist
+**Admin UI (easiest):** Drag the ⠿ handle to reorder. Changes save immediately via `POST /api/admin/devices/{id}/images/reorder`.
 
-### Upload example
+**CLI:**
 ```bash
-npm run signage -- upload device_abc123 /tmp/photo1.jpg /tmp/photo2.png
+signage reorder DEVICE_ID IMAGE_ID_1 IMAGE_ID_2 IMAGE_ID_3 ...
 ```
 
-## Remove Images
+## Per-Slide Delay Override
+By default, all slides use the global device delay. Override per-slide:
 
-### Remove a specific image from a device's playlist
+**Admin UI:**
+1. Click the delay number on any slide
+2. Type new value (2–3600 seconds)
+3. Press Enter — saves immediately
+4. Click × to revert to global delay
+
+**CLI:**
 ```bash
-npm run signage -- remove-image DEVICE_ID IMAGE_ID
+signage set-delay DEVICE_ID IMAGE_ID --seconds 30
+signage set-delay DEVICE_ID IMAGE_ID --clear  # revert to global
 ```
 
-### Clear all images from a device
+**API:**
 ```bash
-npm run signage -- clear DEVICE_ID
+curl -X PATCH http://127.0.0.1:3002/api/admin/devices/DEVICE_ID/images/IMAGE_ID \
+  -H "Content-Type: application/json" \
+  -d '{"delaySeconds": 30}'
 ```
 
-## View Content
+## Reset All Delays to Global
+**Admin UI:** Click "Reset all to global delay" button at bottom of playlist.
+**CLI:** `signage reset-delays DEVICE_ID`
 
-### Show device playlist and image list
+## Rename a Slide
+**Admin UI:** Click "Edit name" on any slide → type new name → "Save".
+**CLI:** `signage rename DEVICE_ID IMAGE_ID --name "New Name"`
+
+## Clear Playlist
 ```bash
-npm run signage -- show DEVICE_ID
+signage clear DEVICE_ID
+```
+Removes all images/videos from device playlist. Does not delete files from uploads directory.
+
+## Remove Single Item
+```bash
+signage remove DEVICE_ID IMAGE_ID
 ```
 
-Or via API:
+## Push to Multiple Devices
 ```bash
-curl http://127.0.0.1:3002/api/admin/state
+# All paired devices
+signage push --all /path/to/image.jpg
+
+# Specific devices
+signage push DEVICE1_ID /path/to/image.jpg
+signage push DEVICE2_ID /path/to/image.jpg
 ```
 
-## Image Requirements
-- Formats: JPEG, PNG (based on Fire TV Android receiver)
-- Recommended: Full HD (1920x1080) or whatever the Fire TV resolution is
-- Files are stored in `~/.openclaw/workspace/fire-tv-signage/backend/data/uploads/`
+## Image vs Video Detection
+Backend detects by MIME type during upload:
+- `image/*` → stored as image, `isVideo: false`
+- `video/*` → stored as video, `isVideo: true`
 
-## How Display Works
-- Receiver (Fire TV app) polls `GET /api/receiver/devices/{deviceId}/playlist` every 5 seconds
-- When a new image is added, it appears on the TV on the next poll cycle
-- Slides advance based on the `--delay` setting (default: whatever is set per device)
+Receiver app detects by URL extension (`.mp4`, `.mkv`, `.mov`, `.webm`, `.avi`, `.3gp`).
 
-See also: [[fire-tv-signage.devices]], [[fire-tv-signage.manage]]
+## Storage
+Uploaded files stored at:
+`~/.openclaw/workspace/fire-tv-signage/backend/data/uploads/`
+File paths tracked in `db.json` per device.
+
+## See Also
+- [[fire-tv-signage.push]] — Push workflow
+- [[fire-tv-signage.devices]] — Device listing
+- [[fire-tv-signage.video]] — Video file requirements
+- [[fire-tv-signage.library]] — Library for quick redeployment

@@ -4,53 +4,64 @@ priority: high
 links:
   - SKILL
   - fire-tv-signage.devices
-  - fire-tv-signage.content
 ---
 
-# fire-tv-signage.manage
+# fire-tv-signage.manage — Backend Management
 
-Start, stop, restart, and health-check the Fire TV Signage backend.
-
-## Backend Details
-- **Location:** `~/.openclaw/workspace/fire-tv-signage/backend/`
-- **URL:** `http://192.168.2.90:3002`
-- **Admin UI:** `http://192.168.2.90:3002` (in browser)
-- **Startup:** `node server.mjs` (Node.js ES module, `type: module` in package.json)
-
-## Commands
-
-### Start the backend
+## Start Backend
 ```bash
-cd ~/.openclaw/workspace/fire-tv-signage/backend && node server.mjs &
+cd ~/.openclaw/workspace/fire-tv-signage/backend && node server.mjs
+# Or:
+npm run signage -- start
 ```
 
-### Health check
+Backend starts on `0.0.0.0:3002`. Data stored in `~/.openclaw/workspace/fire-tv-signage/backend/data/`.
+
+## Health Check
 ```bash
-curl http://127.0.0.1:3002/api/health
+npm run signage -- health
 ```
-Returns: `{"ok":true,"devices":N,"pendingPairings":M}`
+Returns:
+- Server uptime
+- Number of paired devices
+- Uptime in hours
+- Last activity time
 
-### Check admin state
+## Restart Backend
 ```bash
-curl http://127.0.0.1:3002/api/admin/state
+npm run signage -- restart
 ```
-Returns full state including all devices and pending pairings.
+Kills existing process and restarts. Zero-downtime restart not required for signage — displays poll every 5s and recover automatically.
 
-### Stop the backend
+## Check if Running
 ```bash
-pkill -f "node server.mjs" || pkill -f "fire-tv-signage"
+npm run signage -- status
 ```
+Returns running/stopped + port binding info.
 
-### Restart (stop + start)
+## Logs
+Backend writes to `~/.openclaw/workspace/fire-tv-signage/backend/signage.log` when started with `nohup`.
+Check with: `tail -f ~/.openclaw/workspace/fire-tv-signage/backend/signage.log`
+
+## Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SIGNAGE_DATA_DIR` | `./data/` | Data directory |
+| `SIGNAGE_UPLOAD_DIR` | `./data/uploads/` | Uploaded media |
+| `SIGNAGE_PORT` | `3002` | Listen port |
+| `SIGNAGE_HOST` | `0.0.0.0` | Bind address |
+
+## Troubleshooting
+- **Port 3002 in use:** `pkill -f "signage.*server.mjs"; npm run signage -- start`
+- **Permissions error:** Ensure node process has write access to data directory
+- **Data directory missing:** Server auto-creates on first start
+
+## Service Setup (optional)
+For auto-start on boot, create a systemd service:
 ```bash
-pkill -f "node server.mjs" 2>/dev/null; sleep 1; cd ~/.openclaw/workspace/fire-tv-signage/backend && node server.mjs &
+# Location: ~/.openclaw/workspace/fire-tv-signage/backend/signage.service
 ```
 
-## Log
-Backend stdout/stderr goes to `~/.openclaw/workspace/logs/fire-tv-signage.log`.
-
-## When to restart
-- After editing the server.mjs
-- After changing device state via CLI (usually live reload is automatic, but if behavior seems stale)
-
-See also: [[fire-tv-signage.devices]], [[fire-tv-signage.content]]
+## See Also
+- [[fire-tv-signage.devices]] — Device management (backend must be running)
+- [[fire-tv-signage.content]] — Content management (backend must be running)

@@ -15,6 +15,11 @@ const els = {
 let state = { devices: [], pendingPairings: [], baseUrl: "" };
 let selectedDeviceId = localStorage.getItem("selectedDeviceId") || "";
 let refreshTimer = null;
+let activeEditImageId = null;
+let pendingDeviceLabel = "";
+let pendingDeviceLocation = "";
+let pendingDeviceDelay = 0;
+let dragImageId = null;
 
 els.refreshButton.addEventListener("click", () => loadState({ keepStatus: false }));
 
@@ -57,7 +62,10 @@ function render() {
   document.body.dataset.hasDisplays = state.devices.length ? "true" : "false";
   renderPending();
   renderDevices();
-  renderWorkspace();
+  // Only re-render workspace if not mid-edit (to avoid wiping inputs)
+  if (!activeEditImageId && !document.querySelector(".edit-image-name[name='saving']")) {
+    renderWorkspace();
+  }
 }
 
 function renderPending() {
@@ -161,60 +169,211 @@ function renderWorkspace() {
         <h2 id="playlistTitle">Playlist</h2>
         <span class="meta">${device.images?.length || 0} items - ${Number(device.delaySeconds || 10)}s delay</span>
       </div>
-      ${renderPlaylist(device)}
+      <div id="playlistContainer"></div>
     </section>
   `;
 
   bindWorkspace(device);
+  const playlistContainer = document.querySelector("#playlistContainer");
+  if (playlistContainer) {
+    const playlist = renderPlaylist(device);
+    playlistContainer.replaceWith(playlist);
+  }
 }
 
 function renderPlaylist(device) {
   if (!device.images?.length) {
     return `<div class="empty-list playlist-empty"><span class="empty-visual" aria-hidden="true"></span><p>No images on this display</p></div>`;
   }
+  const globalDelay = Number(device.delaySeconds || 10);
+  const wrap = document.createElement("div");
+  wrap.className = "asset-grid";
+  wrap.id = "assetGrid";
 
-  return `
-    <div class="asset-grid">
-      ${device.images.map((image, index) => `
-        <article class="asset ${image.isVideo ? 'asset-video' : ''}" data-image="${escapeHtml(image.id)}">
-          <div class="asset-preview ${image.isVideo ? 'video-thumb' : ''}">
-            ${image.isVideo
-              ? `<div class="video-icon">▶</div><span class="video-label">${escapeHtml(image.name)}</span>`
-              : `<img src="${escapeAttr(image.path)}" alt="${escapeHtml(image.name)}">`
-            }
-          </div>
-          <div class="asset-row">
-            <span class="asset-name">
-              <strong class="slide-name-display">${escapeHtml(image.name)}</strong>
-              <input class="slide-name-input" type="text" value="${escapeAttr(image.name)}" style="display:none;width:100%;font-size:13px;">
-              <span class="meta">${image.isVideo ? 'VIDEO' : 'Slide ' + (index + 1)}</span>
-            </span>
-            <button class="secondary edit-image-name" type="button">Edit name</button>
-            <button class="danger delete-image" type="button">Remove</button>
-          </div>
-        </article>
-      `).join("")}
-    </div>
-  `;
-}
+  device.images.forEach((image, index) => {
+    const article = document.createElement("article");
+    article.className = `asset${image.isVideo ? " asset-video" : ""}`;
+    article.dataset.image = image.id;
+    article.draggable = true;
 
-function bindWorkspace(device) {
-  document.querySelector("#settingsForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await runAction("Saving settings", async () => {
-      await api(`/api/admin/devices/${encodeURIComponent(device.id)}`, {
-        method: "PATCH",
-        body: {
-          label: document.querySelector("#deviceLabel").value,
-          location: document.querySelector("#deviceLocation").value,
-          delaySeconds: Number(document.querySelector("#delaySeconds").value)
-        }
+    // Drag handle
+    const handle = document.createElement("div");
+    handle.className = "drag-handle";
+    handle.textContent = "⠿";
+    handle.title = "Drag to reorder";
+
+    // Preview
+    const preview = document.createElement("div");
+    preview.className = `asset-preview${image.isVideo ? " video-thumb" : ""}`;
+    if (image.isVideo) {
+      preview.innerHTML = `<div class="video-icon">▶</div><span class="video-label">${escapeHtml(image.name)}</span>`;
+    } else {
+      const img = document.createElement("img");
+      img.src = image.path;
+      img.alt = image.name;
+      preview.appendChild(img);
+    }
+
+    // Info row
+    const infoRow = document.createElement("div");
+    infoRow.className = "asset-info-row";
+
+    const nameCol = document.createElement("div");
+    nameCol.className = "asset-name-col";
+    const nameSpan = document.createElement("strong");
+    nameSpan.className = "slide-name-display";
+    nameSpan.textContent = image.name;
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "slide-name-input";
+    nameInput.value = image.name;
+    nameInput.style.display = "none";
+    nameCol.append(nameSpan, nameInput);
+
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    meta.textContent = image.isVideo ? "VIDEO" : `Slide ${index + 1}`;
+    nameCol.append(meta);
+
+    // Delay override row
+    const delayRow = document.createElement("div");
+    delayRow.className = "asset-delay-row";
+    const delayLabel = document.createElement("span");
+    delayLabel.className = "delay-label";
+    delayLabel.textContent = image.delaySeconds ? `${image.delaySeconds}s` : `${globalDelay}s auto`;
+    const delayInput = document.createElement("input");
+    delayInput.type = "number";
+    delayInput.className = "slide-delay-input";
+    delayInput.min = "2";
+    delayInput.max = "3600";
+    delayInput.value = image.delaySeconds || globalDelay;
+    delayInput.title = "Override delay (seconds)";
+    const delayClear = document.createElement("button");
+    delayClear.type = "button";
+    delayClear.className = "delay-clear";
+    delayClear.textContent = "×";
+    delayClear.title = "Use global delay";
+    delayRow.append(delayLabel, delayInput, delayClear);
+
+    const actionsCol = document.createElement("div");
+    actionsCol.className = "asset-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "secondary edit-image-name";
+    editBtn.textContent = "Edit name";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "danger delete-image";
+    deleteBtn.textContent = "Remove";
+
+    actionsCol.append(editBtn, deleteBtn);
+    infoRow.append(nameCol, delayRow, actionsCol);
+
+    article.append(handle, preview, infoRow);
+    wrap.appendChild(article);
+  });
+
+  // Reset button
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
+  resetBtn.className = "secondary reset-delays";
+  resetBtn.textContent = "Reset all to global delay";
+  resetBtn.style.marginTop = "8px";
+  wrap.appendChild(resetBtn);
+
+  // Attach drag events after appending (edit/delete handled inside device.images.forEach above)
+  const assets = wrap.querySelectorAll(".asset");
+  assets.forEach((article) => {
+    article.addEventListener("dragstart", (e) => {
+      dragImageId = article.dataset.image;
+      e.dataTransfer.effectAllowed = "move";
+      article.style.opacity = "0.4";
+    });
+    article.addEventListener("dragend", () => {
+      dragImageId = null;
+      article.style.opacity = "";
+    });
+    article.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    });
+    article.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      if (!dragImageId || dragImageId === article.dataset.image) return;
+      const ids = Array.from(wrap.querySelectorAll(".asset")).map((a) => a.dataset.image);
+      const fromIdx = ids.indexOf(dragImageId);
+      const toIdx = ids.indexOf(article.dataset.image);
+      ids.splice(fromIdx, 1);
+      ids.splice(toIdx, 0, dragImageId);
+      await runAction("Reordering...", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/images/reorder`, {
+          method: "POST",
+          body: { order: ids }
+        });
+        await loadState({ keepStatus: true });
       });
+    });
+  });
+
+  // Reset all delays
+  resetBtn.addEventListener("click", async () => {
+    await runAction("Resetting delays...", async () => {
+      for (const img of device.images) {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/images/${img.id}`, {
+          method: "PATCH",
+          body: { delaySeconds: null }
+        });
+      }
       await loadState({ keepStatus: true });
     });
   });
 
-  document.querySelector("#uploadForm").addEventListener("submit", async (event) => {
+  return wrap;
+}
+
+function bindWorkspace(device) {
+  const sf = document.querySelector("#settingsForm");
+  const uf = document.querySelector("#uploadForm");
+  if (!sf || !uf) { console.error("forms missing:", { sf, uf, workspaceChildren: els.displayWorkspace.children.length }); return; }
+  // Restore pending values if user is mid-edit
+  const savedLabel = pendingDeviceLabel || device.label || "";
+  const savedLocation = pendingDeviceLocation || device.location || "";
+  const savedDelay = pendingDeviceDelay || device.delaySeconds || 10;
+  const labelInput = sf.querySelector("#deviceLabel");
+  const locationInput = sf.querySelector("#deviceLocation");
+  const delayInput = sf.querySelector("#delaySeconds");
+  if (labelInput) labelInput.value = savedLabel;
+  if (locationInput) locationInput.value = savedLocation;
+  if (delayInput) delayInput.value = savedDelay;
+
+  sf.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    // Persist current values so re-render doesn't wipe them
+    const l = sf.querySelector("#deviceLabel")?.value;
+    const loc = sf.querySelector("#deviceLocation")?.value;
+    const d = Number(sf.querySelector("#delaySeconds")?.value);
+    if (l !== undefined) pendingDeviceLabel = l;
+    if (loc !== undefined) pendingDeviceLocation = loc;
+    if (!isNaN(d)) pendingDeviceDelay = d;
+    await runAction("Saving settings", async () => {
+      await api(`/api/admin/devices/${encodeURIComponent(device.id)}`, {
+        method: "PATCH",
+        body: {
+          label: pendingDeviceLabel,
+          location: pendingDeviceLocation,
+          delaySeconds: pendingDeviceDelay
+        }
+      });
+      pendingDeviceLabel = "";
+      pendingDeviceLocation = "";
+      pendingDeviceDelay = 0;
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  uf.addEventListener("submit", async (event) => {
     event.preventDefault();
     const files = Array.from(document.querySelector("#imageUpload").files || []);
     if (!files.length) {
@@ -241,11 +400,13 @@ function bindWorkspace(device) {
       const nameSpan = article.querySelector(".slide-name-display");
       const nameInput = article.querySelector(".slide-name-input");
       if (button.textContent === "Edit name") {
+        activeEditImageId = article.dataset.image;
         nameSpan.style.display = "none";
         nameInput.style.display = "block";
         nameInput.focus();
         button.textContent = "Save";
       } else {
+        activeEditImageId = null;
         const newName = nameInput.value.trim();
         if (!newName) { showToast("Name cannot be empty."); return; }
         const imageId = article.dataset.image;
@@ -254,7 +415,11 @@ function bindWorkspace(device) {
             method: "PATCH",
             body: { name: newName }
           });
-          nameSpan.textContent = result.image.name;
+          if (result?.image) {
+            nameSpan.textContent = result.image.name;
+          } else if (result?.ok) {
+            nameSpan.textContent = newName;
+          }
           nameSpan.style.display = "";
           nameInput.style.display = "none";
           button.textContent = "Edit name";
