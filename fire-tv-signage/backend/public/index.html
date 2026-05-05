@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fire TV Signage</title>
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>
+            <h1>Fire TV Signage</h1>
+            <span id="serverUrl" class="server-url">Connecting...</span>
+          </span>
+        </div>
+        <div class="header-actions">
+          <span id="saveState" class="save-state">Ready</span>
+          <button id="refreshButton" class="icon-button" type="button" title="Refresh" aria-label="Refresh">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <section class="pairing-band" aria-labelledby="pairingTitle">
+        <div>
+          <h2 id="pairingTitle">Pairing</h2>
+          <div id="pendingPairings" class="pending-pairings"></div>
+        </div>
+        <form id="pairForm" class="pair-form">
+          <label>
+            Code
+            <input id="pairCode" autocomplete="off" maxlength="12" placeholder="ABC123" required>
+          </label>
+          <label>
+            Name
+            <input id="pairLabel" autocomplete="off" placeholder="Lobby Display">
+          </label>
+          <button type="submit">Pair</button>
+        </form>
+      </section>
+
+      <section class="workspace">
+        <aside class="display-list" aria-labelledby="displayListTitle">
+          <div class="section-head">
+            <h2 id="displayListTitle">Displays</h2>
+            <span id="displayCount" class="count">0</span>
+          </div>
+          <div id="devices" class="devices"></div>
+        </aside>
+
+        <section id="displayWorkspace" class="display-workspace" aria-live="polite"></section>
+      </section>
+    </main>
+
+    <template id="emptyWorkspaceTemplate">
+      <div class="empty-workspace">
+        <span class="empty-visual" aria-hidden="true"></span>
+        <h2>No Display Selected</h2>
+        <p>Pair or select a display to manage its playlist.</p>
+      </div>
+    </template>
+
+    <script src="/admin.js" type="module"></script>
+  </body>
+</html>

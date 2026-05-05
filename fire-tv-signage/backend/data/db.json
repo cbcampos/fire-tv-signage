@@ -1,0 +1,252 @@
+{
+  "pairingCodes": {
+    "ABC123": {
+      "code": "ABC123",
+      "paired": false,
+      "seenAt": "2026-05-05T16:03:30.161Z",
+      "deviceId": "test123",
+      "name": "test",
+      "lastSeenAt": "2026-05-05T16:03:30.161Z"
+    },
+    "2GU9G6": {
+      "code": "2GU9G6",
+      "paired": true,
+      "seenAt": "2026-05-05T16:04:42.988Z",
+      "deviceId": "d82e6065-8395-4cf7-9863-6294159661bb",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:05:21.963Z",
+      "label": "Fire TV Living Room",
+      "token": "-LJZWsAfT6z5bdYMZs5rygxxdOjnBhwK",
+      "approvedAt": "2026-05-05T16:05:19.070Z"
+    },
+    "4CCS7Y": {
+      "code": "4CCS7Y",
+      "paired": true,
+      "seenAt": "2026-05-05T16:26:53.079Z",
+      "deviceId": "test",
+      "name": "test",
+      "lastSeenAt": "2026-05-05T16:31:23.491Z",
+      "label": "Fire TV Living Room",
+      "token": "X2S7SA85ywKJys6gqzGervONEYE2wwNB",
+      "approvedAt": "2026-05-05T16:28:04.879Z"
+    },
+    "BF9HEN": {
+      "code": "BF9HEN",
+      "paired": true,
+      "seenAt": "2026-05-05T16:31:50.522Z",
+      "deviceId": "4f86a51f-4a6d-47ee-b2d3-ac5e91087427",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:45:15.794Z",
+      "label": "Fire TV Signage",
+      "token": "dFGlROnBf2EGgd_jKT9Ojm-feetXOjgH",
+      "approvedAt": "2026-05-05T17:45:52.622Z"
+    },
+    "9CXWJD": {
+      "code": "9CXWJD",
+      "paired": true,
+      "seenAt": "2026-05-05T16:45:22.257Z",
+      "deviceId": "2193cd1b-dd44-4b12-9617-255cbacc0371",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:47:37.361Z",
+      "label": "Fire TV Signage",
+      "token": "ZXeLF9bKzeugBpQjsSbVZPPcedLfdH4r",
+      "approvedAt": "2026-05-05T17:45:53.650Z"
+    },
+    "UZGZC9": {
+      "code": "UZGZC9",
+      "paired": true,
+      "seenAt": "2026-05-05T16:47:44.170Z",
+      "deviceId": "4ce97d3e-2e2d-4658-af0a-537fd78c6893",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:49:32.219Z",
+      "label": "Fire TV Signage",
+      "token": "6HOoutR4f4GoBbIMAAsk5phRZr2tJi7p",
+      "approvedAt": "2026-05-05T17:36:58.481Z"
+    },
+    "4LMYC5": {
+      "code": "4LMYC5",
+      "paired": true,
+      "seenAt": "2026-05-05T16:49:36.883Z",
+      "deviceId": "c8fddc51-29a3-4ed0-b8f6-25cd4760c4ef",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:51:27.984Z",
+      "label": "Fire TV Signage",
+      "token": "TjqblwyIGgkvm5N6w7GWQ5LO_Y3Ccknr",
+      "approvedAt": "2026-05-05T16:51:27.880Z"
+    },
+    "PUXFP8": {
+      "code": "PUXFP8",
+      "paired": true,
+      "seenAt": "2026-05-05T17:10:15.312Z",
+      "deviceId": "9b9d72e0-fa01-4609-b64e-97a3a2639a9e",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:11:03.282Z",
+      "label": "Fire TV Signage",
+      "token": "0E8MYyJcjAgqeRbPC2CcxJB1mgEsoa9g",
+      "approvedAt": "2026-05-05T17:11:02.064Z"
+    },
+    "R8V3TP": {
+      "code": "R8V3TP",
+      "paired": true,
+      "seenAt": "2026-05-05T17:14:34.256Z",
+      "deviceId": "adde6c94-f65d-41a6-a4c6-08f69c63f874",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:15:04.291Z",
+      "label": "Fire TV Signage",
+      "token": "Xf-0FKloxrdWSK4viPlpcnhnX68HdnIB",
+      "approvedAt": "2026-05-05T17:15:03.355Z"
+    },
+    "BRZF23": {
+      "code": "BRZF23",
+      "paired": true,
+      "seenAt": "2026-05-05T17:33:05.928Z",
+      "deviceId": "60912977-a2d4-400b-b041-2f0612667051",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:34:57.069Z",
+      "label": "Fire TV Signage",
+      "token": "k72krFLvzMeWa_rwgQjo2OvOnTP4f30W",
+      "approvedAt": "2026-05-05T17:34:54.282Z"
+    }
+  },
+  "devices": {
+    "d82e6065-8395-4cf7-9863-6294159661bb": {
+      "id": "d82e6065-8395-4cf7-9863-6294159661bb",
+      "label": "Fire TV Living Room",
+      "token": "-LJZWsAfT6z5bdYMZs5rygxxdOjnBhwK",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "48549c87-ef7d-4e89-806e-fa9904b5abce",
+          "name": "firetv_screen.png",
+          "mime": "image/png",
+          "path": "/uploads/48549c87-ef7d-4e89-806e-fa9904b5abce.png",
+          "createdAt": "2026-05-05T16:06:01.972Z"
+        }
+      ],
+      "createdAt": "2026-05-05T16:05:21.963Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:09:51.684Z"
+    },
+    "6b7ef819-1945-47d2-870a-b1422d3dcc2b": {
+      "id": "6b7ef819-1945-47d2-870a-b1422d3dcc2b",
+      "label": "Fire TV Living Room",
+      "token": "X2S7SA85ywKJys6gqzGervONEYE2wwNB",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "9850406c-7ef6-4342-a3e6-e4b0468fb46d",
+          "name": "firetv_screen.png",
+          "mime": "image/png",
+          "path": "/uploads/9850406c-7ef6-4342-a3e6-e4b0468fb46d.png",
+          "createdAt": "2026-05-05T16:28:49.003Z"
+        },
+        {
+          "id": "bca4fd53-f9b4-437a-9118-7d97fa29a1b2",
+          "name": "firetv_logo.png",
+          "mime": "image/png",
+          "path": "/uploads/bca4fd53-f9b4-437a-9118-7d97fa29a1b2.png",
+          "createdAt": "2026-05-05T16:43:26.306Z"
+        }
+      ],
+      "createdAt": "2026-05-05T16:28:07.438Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T16:44:03.713Z"
+    },
+    "test": {
+      "id": "test",
+      "label": "Fire TV Living Room",
+      "token": "X2S7SA85ywKJys6gqzGervONEYE2wwNB",
+      "delaySeconds": 10,
+      "images": [],
+      "createdAt": "2026-05-05T16:31:23.491Z",
+      "name": "test",
+      "lastSeenAt": "2026-05-05T16:31:23.491Z"
+    },
+    "c8fddc51-29a3-4ed0-b8f6-25cd4760c4ef": {
+      "id": "c8fddc51-29a3-4ed0-b8f6-25cd4760c4ef",
+      "label": "Fire TV Signage",
+      "token": "TjqblwyIGgkvm5N6w7GWQ5LO_Y3Ccknr",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "9f5e528b-dae6-48ca-8b44-fe03fbd1ab21",
+          "name": "firetv_logo.png",
+          "mime": "image/png",
+          "path": "/uploads/9f5e528b-dae6-48ca-8b44-fe03fbd1ab21.png",
+          "createdAt": "2026-05-05T16:52:08.538Z"
+        },
+        {
+          "id": "e82030ea-187e-41b8-aa68-6709449b81d6",
+          "name": "e077a41e-ee5a-4a45-8b87-45ba5ef913e4.png",
+          "mime": "image/png",
+          "path": "/uploads/e82030ea-187e-41b8-aa68-6709449b81d6.png",
+          "createdAt": "2026-05-05T17:24:09.598Z"
+        }
+      ],
+      "createdAt": "2026-05-05T16:51:27.984Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:35:16.490Z"
+    },
+    "9b9d72e0-fa01-4609-b64e-97a3a2639a9e": {
+      "id": "9b9d72e0-fa01-4609-b64e-97a3a2639a9e",
+      "label": "Fire TV Signage",
+      "token": "0E8MYyJcjAgqeRbPC2CcxJB1mgEsoa9g",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "ea13ea81-2dfc-493c-9204-fee2ee648977",
+          "name": "firetv_logo.png",
+          "mime": "image/png",
+          "path": "/uploads/ea13ea81-2dfc-493c-9204-fee2ee648977.png",
+          "createdAt": "2026-05-05T17:12:40.952Z"
+        }
+      ],
+      "createdAt": "2026-05-05T17:11:03.282Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:11:03.349Z"
+    },
+    "adde6c94-f65d-41a6-a4c6-08f69c63f874": {
+      "id": "adde6c94-f65d-41a6-a4c6-08f69c63f874",
+      "label": "Fire TV Signage",
+      "token": "Xf-0FKloxrdWSK4viPlpcnhnX68HdnIB",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "0e70306e-7b77-4918-af3a-0ccbe1af33ca",
+          "name": "firetv_logo.png",
+          "mime": "image/png",
+          "path": "/uploads/0e70306e-7b77-4918-af3a-0ccbe1af33ca.png",
+          "createdAt": "2026-05-05T17:15:40.180Z"
+        }
+      ],
+      "createdAt": "2026-05-05T17:15:04.291Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:33:00.357Z"
+    },
+    "60912977-a2d4-400b-b041-2f0612667051": {
+      "id": "60912977-a2d4-400b-b041-2f0612667051",
+      "label": "Fire TV Signage",
+      "token": "k72krFLvzMeWa_rwgQjo2OvOnTP4f30W",
+      "delaySeconds": 10,
+      "images": [
+        {
+          "id": "ea50f3ca-ca8d-4f15-af0a-13b7baa876b2",
+          "name": "firetv_logo.png",
+          "mime": "image/png",
+          "path": "/uploads/ea50f3ca-ca8d-4f15-af0a-13b7baa876b2.png",
+          "createdAt": "2026-05-05T17:39:06.832Z"
+        },
+        {
+          "id": "627f26e9-d5a7-4d22-9c03-9415245b270a",
+          "name": "e077a41e-ee5a-4a45-8b87-45ba5ef913e4.png",
+          "mime": "image/png",
+          "path": "/uploads/627f26e9-d5a7-4d22-9c03-9415245b270a.png",
+          "createdAt": "2026-05-05T17:39:10.049Z"
+        }
+      ],
+      "createdAt": "2026-05-05T17:34:57.069Z",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-05T17:48:39.763Z"
+    }
+  }
+}

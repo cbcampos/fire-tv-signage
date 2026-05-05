@@ -1,0 +1,17 @@
+{
+  "name": "fire-tv-signage-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check public/admin.js && node --check cli.mjs",
+    "signage": "node cli.mjs"
+  },
+  "bin": {
+    "signage": "./cli.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

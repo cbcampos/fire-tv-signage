@@ -1,0 +1,22 @@
+[Unit]
+Description=Fire TV Signage Backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/fire-tv-signage/backend
+Environment=NODE_ENV=production
+Environment=PORT=3002
+Environment=HOST=0.0.0.0
+Environment=PUBLIC_BASE_URL=http://192.168.2.90:3002
+Environment=SIGNAGE_DATA_DIR=/var/lib/fire-tv-signage
+Environment=SIGNAGE_UPLOAD_DIR=/var/lib/fire-tv-signage/uploads
+ExecStart=/usr/bin/node /opt/fire-tv-signage/backend/server.mjs
+Restart=always
+RestartSec=5
+User=signage
+Group=signage
+
+[Install]
+WantedBy=multi-user.target

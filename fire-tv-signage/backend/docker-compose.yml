@@ -1,0 +1,16 @@
+services:
+  signage-backend:
+    build: .
+    container_name: fire-tv-signage-backend
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+      HOST: "0.0.0.0"
+      SIGNAGE_DATA_DIR: /data
+      SIGNAGE_UPLOAD_DIR: /data/uploads
+      # Optional: set this if a reverse proxy gives the backend a stable URL.
+      PUBLIC_BASE_URL: http://192.168.2.90:3002
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./data:/data
