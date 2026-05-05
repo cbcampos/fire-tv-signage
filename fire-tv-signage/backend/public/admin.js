@@ -123,6 +123,10 @@ function renderWorkspace() {
     <div class="detail-head">
       <div class="detail-title">
         <h2>${escapeHtml(device.label || "Signage Display")}</h2>
+        ${device.location ? `<span class="location-tag">${escapeHtml(device.location)}</span>` : ""}
+      </div>
+      <div class="meta-row">
+        ${device.location ? `<span class="meta">${escapeHtml(device.location)}</span>` : ""}
         <span class="meta">${escapeHtml(device.id)}</span>
       </div>
       <span class="status-pill ${status.className}"><span aria-hidden="true"></span>${status.label}</span>
@@ -134,7 +138,11 @@ function renderWorkspace() {
         <input id="deviceLabel" value="${escapeAttr(device.label || "")}" placeholder="Lobby Display">
       </label>
       <label>
-        Slide delay
+        Location
+        <input id="deviceLocation" value="${escapeAttr(device.location || "")}" placeholder="Living Room">
+      </label>
+      <label>
+        Slide delay (seconds)
         <input id="delaySeconds" type="number" min="2" max="3600" value="${Number(device.delaySeconds || 10)}">
       </label>
       <button type="submit">Save</button>
@@ -142,8 +150,8 @@ function renderWorkspace() {
 
     <form id="uploadForm" class="upload-zone">
       <label>
-        Images
-        <input id="imageUpload" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple>
+        Images & Video
+        <input id="imageUpload" type="file" accept="image/*,video/mp4,video/webm,video/mkv,video/x-matroska,video/quicktime,video/x-msvideo" multiple>
       </label>
       <button type="submit">Push to Display</button>
     </form>
@@ -151,7 +159,7 @@ function renderWorkspace() {
     <section class="playlist" aria-labelledby="playlistTitle">
       <div class="playlist-head">
         <h2 id="playlistTitle">Playlist</h2>
-        <span class="meta">${Number(device.images?.length || 0)} images - ${Number(device.delaySeconds || 10)} seconds each</span>
+        <span class="meta">${device.images?.length || 0} items - ${Number(device.delaySeconds || 10)}s delay</span>
       </div>
       ${renderPlaylist(device)}
     </section>
@@ -168,13 +176,20 @@ function renderPlaylist(device) {
   return `
     <div class="asset-grid">
       ${device.images.map((image, index) => `
-        <article class="asset" data-image="${escapeHtml(image.id)}">
-          <img class="asset-preview" src="${escapeAttr(image.path)}" alt="">
+        <article class="asset ${image.isVideo ? 'asset-video' : ''}" data-image="${escapeHtml(image.id)}">
+          <div class="asset-preview ${image.isVideo ? 'video-thumb' : ''}">
+            ${image.isVideo
+              ? `<div class="video-icon">▶</div><span class="video-label">${escapeHtml(image.name)}</span>`
+              : `<img src="${escapeAttr(image.path)}" alt="${escapeHtml(image.name)}">`
+            }
+          </div>
           <div class="asset-row">
             <span class="asset-name">
-              <strong>${escapeHtml(image.name)}</strong>
-              <span class="meta">Slide ${index + 1}</span>
+              <strong class="slide-name-display">${escapeHtml(image.name)}</strong>
+              <input class="slide-name-input" type="text" value="${escapeAttr(image.name)}" style="display:none;width:100%;font-size:13px;">
+              <span class="meta">${image.isVideo ? 'VIDEO' : 'Slide ' + (index + 1)}</span>
             </span>
+            <button class="secondary edit-image-name" type="button">Edit name</button>
             <button class="danger delete-image" type="button">Remove</button>
           </div>
         </article>
@@ -191,6 +206,7 @@ function bindWorkspace(device) {
         method: "PATCH",
         body: {
           label: document.querySelector("#deviceLabel").value,
+          location: document.querySelector("#deviceLocation").value,
           delaySeconds: Number(document.querySelector("#delaySeconds").value)
         }
       });
@@ -216,6 +232,34 @@ function bindWorkspace(device) {
         });
       }
       await loadState({ keepStatus: true });
+    });
+  });
+
+  document.querySelectorAll(".edit-image-name").forEach((button) => {
+    button.addEventListener("click", () => {
+      const article = button.closest("[data-image]");
+      const nameSpan = article.querySelector(".slide-name-display");
+      const nameInput = article.querySelector(".slide-name-input");
+      if (button.textContent === "Edit name") {
+        nameSpan.style.display = "none";
+        nameInput.style.display = "block";
+        nameInput.focus();
+        button.textContent = "Save";
+      } else {
+        const newName = nameInput.value.trim();
+        if (!newName) { showToast("Name cannot be empty."); return; }
+        const imageId = article.dataset.image;
+        runAction("Saving name", async () => {
+          const result = await api(`/api/admin/devices/${encodeURIComponent(device.id)}/images/${encodeURIComponent(imageId)}`, {
+            method: "PATCH",
+            body: { name: newName }
+          });
+          nameSpan.textContent = result.image.name;
+          nameSpan.style.display = "";
+          nameInput.style.display = "none";
+          button.textContent = "Edit name";
+        });
+      }
     });
   });
 

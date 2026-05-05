@@ -100,6 +100,9 @@ async function routeApi(req, res, url) {
     if (body.label !== undefined) {
       device.label = String(body.label).trim() || device.label;
     }
+    if (body.location !== undefined) {
+      device.location = String(body.location).trim();
+    }
     if (body.delaySeconds !== undefined) {
       device.delaySeconds = clamp(Number(body.delaySeconds), 2, 3600);
     }
@@ -138,6 +141,18 @@ async function routeApi(req, res, url) {
     const body = await readJson(req, 30 * 1024 * 1024);
     const image = saveDataUrlImage(body.name, body.dataUrl);
     device.images.push(image);
+    saveDb();
+    sendJson(res, 200, { ok: true, image });
+    return;
+  }
+
+  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "images" && parts[5]) {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const image = device.images.find((item) => item.id === parts[5]);
+    if (!image) { sendJson(res, 404, { error: "Image not found." }); return; }
+    const body = await readJson(req);
+    if (body.name !== undefined) image.name = String(body.name).trim().slice(0, 120) || image.name;
     saveDb();
     sendJson(res, 200, { ok: true, image });
     return;
@@ -242,12 +257,15 @@ function adminState(req) {
 }
 
 function saveDataUrlImage(name, dataUrl) {
-  const match = /^data:(image\/(?:png|jpe?g|webp|gif));base64,(.+)$/i.exec(String(dataUrl || ""));
+  const match = /^data:(image\/(?:png|jpe?g|webp|gif)|video\/(?:mp4|webm|mkv|x-matroska|quicktime|x-msvideo));base64,(.+)$/i.exec(String(dataUrl || ""));
   if (!match) {
-    throw new Error("Upload must be a PNG, JPG, WEBP, or GIF data URL.");
+    throw new Error("Upload must be an image (PNG, JPG, WEBP, GIF) or video (MP4, WEBM, MKV, MOV, AVI) data URL.");
   }
   const mime = match[1].toLowerCase();
-  const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
+  const isVideo = mime.startsWith("video/");
+  const ext = isVideo
+    ? mime.includes("mkv") ? "mkv" : mime.includes("webm") ? "webm" : mime.includes("mov") ? "mov" : mime.includes("avi") ? "avi" : "mp4"
+    : mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
   const id = crypto.randomUUID();
   const filename = `${id}.${ext}`;
   const filePath = path.join(UPLOAD_DIR, filename);
@@ -257,6 +275,7 @@ function saveDataUrlImage(name, dataUrl) {
     name: String(name || filename).replace(/[^\w .-]/g, "").slice(0, 120) || filename,
     mime,
     path: `/uploads/${filename}`,
+    isVideo,
     createdAt: new Date().toISOString()
   };
 }
