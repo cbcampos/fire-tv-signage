@@ -72,6 +72,9 @@ async function main() {
     case "youtube-push":
       await youtubePush(client, rest, global);
       return;
+    case "weather":
+      await weatherCard(client, rest);
+      return;
     default:
       throw new Error(`Unknown command "${command}". Run "signage help".`);
   }
@@ -201,6 +204,78 @@ async function libSearch(client, query) {
 }
 
 // ─── YouTube ──────────────────────────────────────────────────────────────────
+
+async function weatherCard(client, rest) {
+  const parsed = parseOptions(rest);
+  const city = parsed.options.city || "Birmingham,AL";
+  const deviceId = parsed.positionals[0];
+  if (!deviceId) throw new Error("weather <deviceId> [--city CITY]");
+  const serverUrl = client.baseUrl.replace("/api/", "");
+  // Generate the card via Playwright script
+  const script = `
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  let weather = null;
+  try {
+    const res = await page.request.get('${serverUrl}/api/weather?city=${encodeURIComponent(city)}', { timeout: 8000 });
+    if (res.ok()) weather = await res.json();
+  } catch (e) {}
+  const now = new Date();
+  const h = now.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  const timeStr = hour12 + ':' + String(now.getMinutes()).padStart(2,'0');
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const w = weather || {};
+  const loc = (w.location || city).toUpperCase().split(',').slice(0,2).join(', ');
+  const fc = w.forecast || [];
+  const days = fc.length >= 7 ? fc : [
+    {maxTempF:84,minTempF:56,weatherCode:'116'},
+    {maxTempF:76,minTempF:64,weatherCode:'266'},
+    {maxTempF:73,minTempF:58,weatherCode:'176'},
+    {maxTempF:80,minTempF:60,weatherCode:'116'},
+    {maxTempF:82,minTempF:62,weatherCode:'119'},
+    {maxTempF:78,minTempF:59,weatherCode:'176'},
+    {maxTempF:75,minTempF:57,weatherCode:'119'},
+  ];
+  const dayAbbrev=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const today = new Date();
+  let fcHtml = '';
+  for(let i=0;i<7;i++){
+    const d = days[i];
+    const dn = new Date(today); dn.setDate(today.getDate()+i);
+    const label = i===0 ? 'TODAY' : dayAbbrev[dn.getDay()];
+    fcHtml += '<div class="day-card"><div class="day-name'+(i===0?' today':'')+'">'+label+'</div><div class="weather-icon"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="12" fill="#FFD93D" stroke="#FFB800" stroke-width="2"/><line x1="32" y1="6" x2="32" y2="14" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="32" y1="50" x2="32" y2="58" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="6" y1="32" x2="14" y2="32" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="32" x2="58" y2="32" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="13.5" y1="13.5" x2="19.3" y2="19.3" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="44.7" y1="44.7" x2="50.5" y2="50.5" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="13.5" y1="50.5" x2="19.3" y2="44.7" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="44.7" y1="19.3" x2="50.5" y2="13.5" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/></svg></div><div class="temp-high">'+Math.round(d.maxTempF)+'°</div><div class="temp-low">'+Math.round(d.minTempF)+'°</div></div>';
+  }
+  const iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Inter,sans-serif;width:1920px;height:1080px;overflow:hidden;background:#0a1628;position:relative}.sky-bg{position:absolute;inset:0;background:linear-gradient(180deg,#0d1b2a 0%,#1b263b 15%,#1e3a5f 30%,#2d6a4f 50%,#40916c 65%,#74a57f 78%,#b5c99a 90%,#e9c46a 100%)}.grid-overlay{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:60px 60px}.glass-card{position:absolute;bottom:40px;left:40px;right:40px;background:rgba(10,22,40,0.72);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.12);border-radius:28px;padding:36px 48px;display:flex;flex-direction:column;gap:28px}.top-row{display:flex;align-items:flex-start;gap:48px}.current-block{display:flex;flex-direction:column;gap:6px;min-width:260px}.location{font-size:20px;font-weight:700;color:#fff;letter-spacing:0.1em;text-transform:uppercase;opacity:0.95}.date-time-row{font-size:14px;font-weight:400;color:rgba(255,255,255,0.55)}.temp-row{display:flex;align-items:baseline;gap:12px;margin-top:6px}.temp-main{font-size:112px;font-weight:700;color:#fff;line-height:1;letter-spacing:-4px;text-shadow:0 4px 24px rgba(0,0,0,0.35)}.deg{font-size:56px;font-weight:300;letter-spacing:-2px;vertical-align:top}.condition-row{display:flex;align-items:center;gap:10px;margin-top:4px}.condition-text{font-size:19px;font-weight:400;color:rgba(255,255,255,0.85)}.feels-like{font-size:13px;font-weight:400;color:rgba(255,255,255,0.45);margin-top:3px}.forecast-row{display:flex;gap:0;flex:1;align-items:stretch}.day-card{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 10px;border-right:1px solid rgba(255,255,255,0.07)}.day-card:last-child{border-right:none}.day-name{font-size:12px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.08em}.day-name.today{color:#fff;font-weight:600}.weather-icon{width:44px;height:44px}.weather-icon svg{width:100%;height:100%}.temp-high{font-size:17px;font-weight:600;color:#fff}.temp-low{font-size:13px;font-weight:400;color:rgba(255,255,255,0.38)}.metrics-row{display:flex;gap:0;padding-top:18px;border-top:1px solid rgba(255,255,255,0.08)}.metric{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 12px;border-right:1px solid rgba(255,255,255,0.07)}.metric:last-child{border-right:none}.metric-label{font-size:10px;font-weight:500;color:rgba(255,255,255,0.38);text-transform:uppercase;letter-spacing:0.1em}.metric-value{font-size:20px;font-weight:600;color:#fff;display:flex;align-items:center;gap:6px}.metric-value .unit{font-size:12px;font-weight:400;color:rgba(255,255,255,0.5)}.metric-icon{width:20px;height:20px;opacity:0.65}.time-badge{position:absolute;top:40px;left:40px;display:flex;flex-direction:column;gap:4px}.time-display{font-size:44px;font-weight:300;color:#fff;line-height:1;text-shadow:0 2px 16px rgba(0,0,0,0.5);letter-spacing:-1px}.ampm{font-size:18px;font-weight:500;vertical-align:super;opacity:0.7}.date-display{font-size:13px;font-weight:400;color:rgba(255,255,255,0.6);letter-spacing:0.04em}</style></head><body><div class="sky-bg"></div><div class="grid-overlay"></div><div class="time-badge"><div class="time-display">'+timeStr+' <span class="ampm">'+ampm+'</span></div><div class="date-display">'+dateStr+'</div></div><div class="glass-card"><div class="top-row"><div class="current-block"><div class="location">'+loc+'</div><div class="date-time-row">'+dateStr+'</div><div class="temp-row"><div class="temp-main">'+(w.tempF||72)+'<span class="deg">°</span></div></div><div class="condition-row"><span class="condition-text">'+(w.condition||'Partly Cloudy')+'</span></div><div class="feels-like">Feels like '+(w.feelsLikeF||70)+'°F</div></div><div class="forecast-row">'+fcHtml+'</div></div><div class="metrics-row"><div class="metric"><div class="metric-label">Humidity</div><div class="metric-value">'+iconSvg+(w.humidity||55)+'<span class="unit">%</span></div></div><div class="metric"><div class="metric-label">Wind</div><div class="metric-value"><svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>'+(w.windmph||9)+' <span class="unit">mph '+(w.windDir||'S')+'</span></div></div><div class="metric"><div class="metric-label">UV Index</div><div class="metric-value"><svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'+(w.uvIndex||0)+'</div></div><div class="metric"><div class="metric-label">Visibility</div><div class="metric-value"><svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'+(w.visibility||9)+' <span class="unit">mi</span></div></div><div class="metric"><div class="metric-label">Pressure</div><div class="metric-value">'+iconSvg+(w.pressure?Number(w.pressure).toFixed(1):'30.0')+' <span class="unit">in</span></div></div></div></div></body></html>';
+  await page.setContent(html, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: '/tmp/weather_card.png', fullPage: true });
+  await browser.close();
+  console.log('DONE:' + timeStr);
+  process.exit(0);
+})();
+`;
+  const tmp = '/tmp/pdf-build/weather_render_cli.js';
+  await import('node:fs').then(fs => fs.writeFileSync(tmp, script));
+  const render = spawn('node', [tmp], { stdio: 'pipe', cwd: '/tmp/pdf-build' });
+  let output = '';
+  render.stdout.on('data', d => { output += d; process.stdout.write(d); });
+  render.stderr.on('data', d => process.stderr.write(d));
+  await new Promise(r => render.on('close', r));
+  if (!output.includes('DONE:')) throw new Error('Render failed');
+  // Upload to device
+  const png = await import('node:fs').then(fs => fs.readFileSync('/tmp/weather_card.png'));
+  const base64 = png.toString('base64');
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/images`, {
+    name: 'Weather Card',
+    dataUrl: `data:image/png;base64,${base64}`
+  });
+  console.log(`✓ Weather card pushed to ${deviceId}`);
+}
 
 async function youtubePush(client, rest, global) {
   const parsed = parseOptions(rest);

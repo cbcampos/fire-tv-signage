@@ -63,6 +63,62 @@ async function routeApi(req, res, url) {
     return;
   }
 
+
+  // ── Weather proxy (wttr.in) ──────────────────────────────────────────
+  if (req.method === "GET" && parts[1] === "weather") {
+    const city = String(url.searchParams.get("city") || "Birmingham,AL").trim();
+    try {
+      const response = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+      if (!response.ok) throw new Error(`wttr.in returned ${response.status}`);
+      const data = await response.json();
+      // Normalize current conditions
+      const current = data.current_condition[0];
+      const nearest = data.nearest_area?.[0];
+      const areaName = nearest?.areaName?.[0]?.value || city;
+      const region = nearest?.region?.[0]?.value || "";
+      const country = nearest?.country?.[0]?.value || "";
+      const location = [areaName, region, country].filter(Boolean).join(", ");
+      // Normalize forecast (next 7 days)
+      const weatherforecast = data.weather || [];
+      const days = (weatherforecast[0]?.hourly || []).length > 0
+        ? [{ date: weatherforecast[0].date, maxTempF: weatherforecast[0].maxtempF, minTempF: weatherforecast[0].mintempF, weatherCode: weatherforecast[0].hourly?.[4]?.weatherCode || 116 }]
+        : [];
+      // If we have multi-day forecast data
+      if (weatherforecast.length >= 2) {
+        days.length = 0;
+        for (let i = 0; i < Math.min(7, weatherforecast.length); i++) {
+          const w = weatherforecast[i];
+          days.push({
+            date: w.date,
+            maxTempF: parseFloat(w.maxtempF),
+            minTempF: parseFloat(w.mintempF),
+            weatherCode: w.hourly?.[4]?.weatherCode || w.hourly?.[0]?.weatherCode || 116
+          });
+        }
+      }
+      sendJson(res, 200, {
+        location,
+        tempF: parseInt(current.temp_F),
+        feelsLikeF: parseInt(current.FeelsLikeF),
+        condition: current.weatherDesc?.[0]?.value || "Unknown",
+        weatherCode: parseInt(current.weatherCode),
+        humidity: parseInt(current.humidity),
+        windmph: parseInt(current.windspeedMiles),
+        windDir: current.winddir16Point || "",
+        uvIndex: parseInt(current.uvIndex),
+        visibility: parseInt(current.visibilityMiles),
+        pressure: parseFloat(current.pressureInches),
+        cloudcover: parseInt(current.cloudcover),
+        forecast: days.slice(0, 7)
+      });
+    } catch (err) {
+      console.error("Weather error:", err.message);
+      sendJson(res, 502, { error: "Weather service unavailable", detail: err.message });
+    }
+    return;
+  }
+
+
   if (req.method === "GET" && parts[1] === "receiver" && parts[2] === "pairing" && parts[3]) {
     handleReceiverPairing(req, res, url, parts[3]);
     return;
@@ -402,7 +458,7 @@ function handleReceiverPlaylist(req, res, url, deviceId) {
       items.push({ id: vid.id, name: vid.name, type: "video", url: vid.path });
     }
   }
-  sendJson(res, 200, { delaySeconds: device.delaySeconds, items });
+  sendJson(res, 200, { delaySeconds: device.delaySeconds, items, images: items });
 }
 
 function adminState(req) {
