@@ -1,0 +1,31 @@
+# Build outputs
+receiver-android/app/build/
+
+# Local APK (don't commit large binaries)
+receiver-android/app-debug.apk
+
+# Data and runtime files
+backend/data/db.json
+backend/data/uploads/
+backend.log
+data/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Gradle
+receiver-android/.gradle/
+
+# Android
+receiver-android/local.properties
+receiver-android/.idea/
+receiver-android/*.iml
+
+# Credentials
+*.env
+*.pem
+*.key

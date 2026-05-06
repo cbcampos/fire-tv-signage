@@ -3,6 +3,7 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(process.env.SIGNAGE_DATA_DIR || path.join(__dirname, "data"));
@@ -99,6 +100,46 @@ async function routeApi(req, res, url) {
     return;
   }
 
+  // ── Add YouTube video to device ────────────────────────────────────────
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "youtube") {
+    const body = await readJson(req);
+    const { youtubeUrl, name } = body || {};
+    if (!youtubeUrl || !youtubeUrl.match(/youtube\.com|youtu\.be/)) {
+      sendJson(res, 400, { error: "Valid YouTube URL required." });
+      return;
+    }
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    // Create a placeholder entry with the YouTube URL
+    const id = crypto.randomUUID();
+    const videoEntry = {
+      id,
+      name: name || "YouTube Video",
+      youtubeUrl,
+      isYouTube: true,
+      createdAt: new Date().toISOString()
+    };
+    if (!device.videos) device.videos = [];
+    device.videos.push(videoEntry);
+    saveDb();
+    sendJson(res, 200, { ok: true, video: videoEntry });
+    return;
+  }
+
+  // ── Remove video from device ─────────────────────────────────────────────
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "youtube" && parts[5]) {
+    const videoId = parts[5];
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    if (!device.videos) { sendJson(res, 404, { error: "Video not found." }); return; }
+    const idx = device.videos.findIndex(v => v.id === videoId);
+    if (idx === -1) { sendJson(res, 404, { error: "Video not found." }); return; }
+    device.videos.splice(idx, 1);
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   // ── Library ────────────────────────────────────────────────────────────────
   if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library") {
     const body = await readJson(req);
@@ -142,9 +183,58 @@ async function routeApi(req, res, url) {
     return;
   }
 
-  // ── Health ────────────────────────────────────────────────────────────────
-  if (req.method === "GET" && parts[1] === "api" && parts[2] === "health") {
-    sendJson(res, 200, { ok: true, devices: Object.keys(db.devices).length, pendingPairings: Object.keys(db.pairingCodes).filter((k) => !db.pairingCodes[k].paired).length });
+  // ── YouTube stream proxy ────────────────────────────────────────────────
+  if (req.method === "GET" && parts[1] === "admin" && parts[2] === "youtube" && parts[3] === "stream") {
+    const youtubeUrl = String(url.searchParams.get("url") || "").trim();
+    if (!youtubeUrl) { sendJson(res, 400, { error: "url parameter required" }); return; }
+    if (!youtubeUrl.match(/youtube\.com|youtu\.be/)) { sendJson(res, 400, { error: "Invalid YouTube URL" }); return; }
+    // Use yt-dlp to get the best direct stream URL
+    const ytdlp = spawn("yt-dlp", ["-J", "--no-download", youtubeUrl], { timeout: 15000 });
+    let output = "";
+    let errorOutput = "";
+    ytdlp.stdout.on("data", (d) => (output += d));
+    ytdlp.stderr.on("data", (d) => (errorOutput += d));
+    ytdlp.on("close", (code) => {
+      if (code !== 0) {
+        console.error("yt-dlp error:", errorOutput.slice(-200));
+        sendJson(res, 502, { error: "Failed to extract YouTube stream", detail: errorOutput.slice(-100) });
+        return;
+      }
+      try {
+        const info = JSON.parse(output);
+        // Get a direct video URL from requested_formats or formats
+        const formats = info.requested_formats || info.formats || [];
+        // Find best MP4 or webm video+audio combo
+        const videoFormats = formats.filter(f => f.vcodec && f.acodec && (f.ext === "mp4" || f.ext === "webm"));
+        // Pick highest quality
+        videoFormats.sort((a, b) => (b.width || 0) - (a.width || 0));
+        const best = videoFormats[0];
+        if (!best || !best.url) {
+          // Fallback: try to get any format with a URL
+          const anyWithUrl = formats.find(f => f.url && f.ext === "mp4");
+          if (anyWithUrl) {
+            sendJson(res, 200, {
+              streamUrl: anyWithUrl.url,
+              title: info.title,
+              duration: info.duration,
+              expiresAt: anyWithUrl.url.includes("expire=") ? extractExpire(anyWithUrl.url) : null
+            });
+          } else {
+            sendJson(res, 502, { error: "No playable format found" });
+          }
+          return;
+        }
+        sendJson(res, 200, {
+          streamUrl: best.url,
+          title: info.title,
+          duration: info.duration,
+          expiresAt: best.url.includes("expire=") ? extractExpire(best.url) : null
+        });
+      } catch (e) {
+        sendJson(res, 502, { error: "Failed to parse yt-dlp output", detail: e.message });
+      }
+    });
+    ytdlp.on("error", (e) => { sendJson(res, 502, { error: "yt-dlp process error", detail: e.message }); });
     return;
   }
 
@@ -301,14 +391,18 @@ function handleReceiverPlaylist(req, res, url, deviceId) {
   }
   device.lastSeenAt = new Date().toISOString();
   saveDb();
-  sendJson(res, 200, {
-    delaySeconds: device.delaySeconds,
-    images: device.images.map((image) => ({
-      id: image.id,
-      name: image.name,
-      url: image.path
-    }))
-  });
+  const items = [];
+  for (const img of (device.images || [])) {
+    items.push({ id: img.id, name: img.name, type: "image", url: img.path });
+  }
+  for (const vid of (device.videos || [])) {
+    if (vid.isYouTube) {
+      items.push({ id: vid.id, name: vid.name, type: "youtube", youtubeUrl: vid.youtubeUrl });
+    } else {
+      items.push({ id: vid.id, name: vid.name, type: "video", url: vid.path });
+    }
+  }
+  sendJson(res, 200, { delaySeconds: device.delaySeconds, items });
 }
 
 function adminState(req) {
@@ -360,6 +454,11 @@ function loadDb() {
 
 function saveDb() {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+}
+
+function extractExpire(url) {
+  const m = /[?&]expire=(\d+)/.exec(url);
+  return m ? new Date(Number(m[1]) * 1000).toISOString() : null;
 }
 
 function cleanPairingCode(input) {
@@ -435,7 +534,14 @@ function serveFile(res, filePath, start, end) {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
-    ".gif": "image/gif"
+    ".gif": "image/gif",
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".3gp": "video/3gpp"
   }[ext] || "application/octet-stream";
 
   if (start !== undefined && end !== undefined) {

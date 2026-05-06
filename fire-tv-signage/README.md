@@ -1,12 +1,13 @@
 # Fire TV Signage
 
-A self-hosted digital signage system for Amazon Fire TV devices. Push images and videos to one or many Fire TV receivers from a web admin panel. Designed for home use — living room displays, family schedules, kitchen signage.
+A self-hosted digital signage system for Amazon Fire TV devices. Push images and videos to one or many Fire TV receivers from a browser admin panel. Designed for home use — living room displays, family schedules, kitchen signage.
 
 ---
 
 ## What it does
 
-- **Push content** (images + videos) to Fire TV receivers from a browser admin panel
+- **Push content** (images + videos + YouTube) to Fire TV receivers from a browser admin panel
+- **YouTube streaming** — play YouTube videos directly without downloading; the app streams from YouTube in real-time via a backend proxy
 - **Auto-play playlists** — content cycles automatically at a configurable interval
 - **Video support** — MP4, WEBM, MKV, MOV, AVI play full-screen with audio
 - **Offline caching** — receivers cache images locally and keep displaying if the network drops
@@ -26,13 +27,31 @@ Browser (Admin UI)              Fire TV (Receiver App)
      |         server.mjs               |
      |                                   |
      |  admin/   devices/  uploads/      |
-     +--- WebSocket poll every 5s -------+
+     +--- polls every 5s ----------------+
 ```
 
 **Components:**
-- **Backend** — Node.js web server (port 3002) serving the admin UI + a REST API for receiver pairing, content management, and playlist delivery
+- **Backend** — Node.js web server (port 3002) serving the admin UI + a REST API for receiver pairing, content management, YouTube stream proxy, and playlist delivery
 - **Receiver APK** — Android app installed on Fire TV; polls the backend every 5 seconds for playlist changes and displays content full-screen
 - **Admin UI** — single-page web app served by the backend at `http://<server>:3002`
+
+### YouTube Streaming How It Works
+
+1. You add a YouTube URL to a device's playlist via the admin UI
+2. When it's time to play, the Android app calls `GET /api/admin/youtube/stream?url=<youtubeUrl>`
+3. The backend uses `yt-dlp` to extract the direct video stream URL (no download)
+4. The backend returns `{ streamUrl, title, duration, expiresAt }`
+5. The app plays the stream URL directly via ExoPlayer — YouTube handles the video delivery
+
+This means **no server-side storage for videos**, instant playback for any YouTube video, and stream URLs that are valid for several hours.
+
+---
+
+## Hardware
+
+- **Fire TV device** — Amazon Fire TV Stick 4K or Fire TV Cube connected to a display
+- **Backend server** — any machine running Node.js (this machine: `192.168.2.90:3002`)
+- **Android SDK** for building the APK (or use the pre-built APK in `receiver-android/app/build/outputs/apk/debug/`)
 
 ---
 
@@ -43,158 +62,202 @@ Browser (Admin UI)              Fire TV (Receiver App)
 ```bash
 cd fire-tv-signage/backend
 npm install
+# Install yt-dlp for YouTube support (optional)
+# npm install -g yt-dlp  # or: brew install yt-dlp
+
 node server.mjs
 ```
 
 The server runs on **port 3002** by default. Access the admin UI at `http://<your-server-ip>:3002`.
 
-To run on a different port:
-```bash
-PORT=8080 node server.mjs
-```
-
-To persist data in a custom directory:
-```bash
-SIGNAGE_DATA_DIR=/path/to/data node server.mjs
-```
-
-To run as a systemd service, use the provided `signage-backend.service` file.
-
-### 2. Build and install the Android app
-
-Requires Android SDK and JDK 17+:
+### 2. Set environment variables (optional)
 
 ```bash
-cd receiver-android
-# If your server is not at the default, update the URL:
-# Edit app/build.gradle.kts and change signageServerUrl
-
-./gradlew assembleDebug
+PORT=3002                    # server port (default: 3002)
+HOST=0.0.0.0                # bind address (default: 0.0.0.0)
+SIGNAGE_DATA_DIR=./data     # where device data and uploads are stored
+SIGNAGE_UPLOAD_DIR=./data/uploads  # uploaded files directory
+PUBLIC_BASE_URL=https://... # if behind a reverse proxy
 ```
 
-The APK will be at `receiver-android/app/build/outputs/apk/debug/app-debug.apk`.
+### 3. Install the receiver app on Fire TV
 
-Install via ADB:
-```bash
-adb install -r app-debug.apk
-```
+1. Enable Developer Options on the Fire TV (Settings → My Fire TV → Developer Options → ADB Debugging = ON)
+2. Find the Fire TV's IP address (Settings → My Fire TV → About → Network)
+3. Connect from this machine:
+   ```bash
+   adb connect <fire-tv-ip>:5555
+   ```
+4. Install the APK:
+   ```bash
+   adb install -r receiver-android/app/build/outputs/apk/debug/app-debug.apk
+   ```
 
-Or side-load directly onto your Fire TV.
-
-### 3. Pair a receiver
+### 4. Pair the device
 
 1. Open the app on the Fire TV — it will show a 6-character pairing code
-2. In the admin UI, find the pending pairing code and click **Use**
-3. Click **Pair** to register the device
-4. Upload images or videos and they will appear on the TV within seconds
+2. Go to `http://<server-ip>:3002` on a browser
+3. Enter the pairing code to link the device to the admin panel
+
+### 5. Add content
+
+- **Images**: Upload PNG, JPG, WEBP, or GIF via the admin UI
+- **Videos**: Upload MP4, WEBM, MKV, MOV, or AVI files
+- **YouTube**: Click "Add YouTube" and paste a YouTube video URL (e.g. `https://www.youtube.com/watch?v=...`)
+
+Assign content to devices from the admin panel. The app will auto-cycle through the playlist at the configured interval (default: 10 seconds per slide).
 
 ---
 
-## Admin UI Reference
-
-**Pairing a new display:**
-- The app generates a new 6-character code on first launch
-- Codes are pending until paired via the admin UI
-- Multiple receivers can be paired to one backend
-
-**Display settings:**
-- **Display name** — custom label (e.g., "Kitchen Display")
-- **Location** — optional location string (e.g., "Kitchen", "Living Room")
-- **Slide delay** — seconds between advancing to the next slide
-
-**Uploading:**
-- Drag & drop or click to select multiple images/videos
-- Videos are automatically detected by MIME type
-- Upload order = display order
-
-**Renaming slides:**
-- Click "Edit name" on any slide to rename it inline
-- The custom name persists and is stored on the backend
-
-**Deleting:**
-- Click "Remove" to delete a slide from the playlist
-- Does not delete the source file from disk
-
----
-
-## API Reference
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/admin/state` | List all paired devices and pending pairings |
-| `POST` | `/api/admin/pair` | Pair a pending receiver (body: `{code, label?}`) |
-| `PATCH` | `/api/admin/devices/:id` | Update device label, location, or delay (`{label?, location?, delaySeconds?}`) |
-| `DELETE` | `/api/admin/devices/:id` | Remove a device |
-| `POST` | `/api/admin/devices/:id/images` | Upload image/video to device (body: `{name, dataUrl}`) |
-| `PATCH` | `/api/admin/devices/:id/images/:imageId` | Rename a slide (`{name}`) |
-| `DELETE` | `/api/admin/devices/:id/images/:imageId` | Remove a slide |
-| `GET` | `/api/receiver/devices/:id/playlist?token=X` | Receiver endpoint: returns playlist for a device |
-
----
-
-## Receiver App Controls
-
-- **Menu button** — open the status panel (network status, pair status, boot-on-startup, device info)
-- **D-pad up/down** — scroll through the menu
-- **Back button** — close the menu
-
----
-
-## Image & Video Behavior
-
-- **Images** — displayed using `FIT_CENTER` scale type; non-16:9 images get black letterboxing (not cropped)
-- **Videos** — detected by `.mp4`/`.webm`/`.mkv`/`.mov`/`.avi` URL extension; played via Android `VideoView`; audio supported
-- **Offline** — images are cached to the app's internal storage; if the TV loses network, the last-displayed images continue to rotate from cache
-- **Cache** — survives app restarts but is cleared on uninstall
-
----
-
-## File Structure
+## Project Structure
 
 ```
 fire-tv-signage/
 ├── backend/
-│   ├── server.mjs          # Node.js backend server
-│   ├── package.json
+│   ├── server.mjs          # Node.js backend server (REST API + admin UI)
 │   ├── public/
-│   │   ├── index.html      # Admin UI
-│   │   ├── admin.js        # Admin UI logic
-│   │   └── app.css         # Admin UI styles
-│   ├── data/
-│   │   ├── db.json         # Device registry + playlist data
-│   │   └── uploads/        # Uploaded image/video files
-│   ├── signage-backend.service  # systemd unit
-│   └── deploy/
-│       └── README.md       # Deployment notes
-├── receiver-android/
-│   ├── app/
-│   │   └── src/main/
-│   │       ├── java/com/signage/receiver/
-│   │       │   ├── MainActivity.java   # Receiver app logic
-│   │       │   └── BootReceiver.java   # Auto-launch on boot
-│   │       ├── AndroidManifest.xml
-│   │       └── res/                    # Icons, strings, styles
-│   ├── build.gradle.kts
-│   └── gradlew
-├── app-debug.apk           # Pre-built receiver APK
-└── README.md
+│   │   ├── index.html      # Admin single-page app
+│   │   ├── app.css
+│   │   └── admin.js         # Admin UI JavaScript
+│   └── data/
+│       ├── db.json          # Device and content database
+│       └── uploads/         # Uploaded image/video files
+│
+└── receiver-android/
+    ├── app/
+    │   └── src/main/java/com/signage/receiver/
+    │       ├── MainActivity.java    # Receiver app (ExoPlayer, playlist polling)
+    │       └── VideoCacheProvider.java  # ContentProvider for local video caching
+    ├── build.gradle.kts     # Android dependencies (Media3 ExoPlayer + HLS)
+    └── gradle.properties    # AndroidX enabled, backend URL configured
 ```
 
 ---
 
-## Requirements
+## Backend API Reference
 
-- **Backend:** Node.js 18+ (no other dependencies)
-- **Fire TV:** Fire OS 5+ (Fire TV Stick, Fire TV Cube, etc.)
-- **Android SDK:** API 21+ target, JDK 17+ for building
-- **Network:** Fire TV and backend server must be on the same LAN
+### Device Management
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/state` | Full admin state: devices, pending pairings, library |
+| `POST` | `/api/admin/pair` | Approve a pending pairing code |
+| `PATCH` | `/api/admin/devices/:id` | Update device label, location, or delaySeconds |
+
+### Content Upload
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/admin/devices/:id/images` | Upload image (base64 dataUrl) to device playlist |
+| `POST` | `/api/admin/devices/:id/youtube` | Add YouTube video URL to device playlist |
+| `DELETE` | `/api/admin/devices/:id/images/:imgId` | Remove image from playlist |
+| `DELETE` | `/api/admin/devices/:id/youtube/:vidId` | Remove YouTube video from playlist |
+
+### Receiver App API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/receiver/pairing/:code` | Request pairing with a 6-char code |
+| `GET` | `/api/receiver/devices/:id/playlist?token=X` | Get device's playlist (images + YouTube items) |
+
+### YouTube Streaming
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/youtube/stream?url=<youtubeUrl>` | Extract direct stream URL from YouTube |
+
+Response:
+```json
+{
+  "streamUrl": "https://rr1---...googlevideo.com/videoplayback?...",
+  "title": "Video Title",
+  "duration": 213,
+  "expiresAt": "2026-05-06T08:47:51.000Z"
+}
+```
+
+Stream URLs expire after several hours. The app re-fetches from the backend each time a YouTube item comes up in the playlist.
 
 ---
 
-## Status Indicators
+## Playlist Item Types
 
-| Status | Meaning |
-|--------|---------|
-| 🟢 **Online** | Seen within the last 20 seconds |
-| 🟡 **Stale** | Seen 20s–2min ago |
-| 🔴 **Offline** | Not seen in over 2 minutes |
+The `/playlist` endpoint returns an `items` array. Each item has a `type`:
+
+```json
+{ "id": "...", "name": "Morning Joke", "type": "image", "url": "/uploads/abc.png" }
+{ "id": "...", "name": "Summer Camp", "type": "video", "url": "/uploads/video.mp4" }
+{ "id": "...", "name": "Rick Roll", "type": "youtube", "youtubeUrl": "https://www.youtube.com/watch?v=..." }
+```
+
+The Android app handles each type differently:
+- `image` — downloaded and displayed with Glide
+- `video` — downloaded to local cache, played with ExoPlayer from file:// URI
+- `youtube` — backend fetches stream URL, ExoPlayer plays the direct URL
+
+---
+
+## Building the Android APK
+
+Requirements: JDK 17+, Android SDK (API 34), `signageServerUrl` set in `gradle.properties`.
+
+```bash
+cd receiver-android
+
+# Set your backend URL
+echo "signageServerUrl=http://192.168.2.90:3002" > gradle.properties
+
+# Build
+JAVA_HOME=/path/to/jdk-17 ./gradlew assembleDebug --no-daemon
+
+# Install
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+---
+
+## Features Built So Far
+
+- [x] Image upload and display (PNG, JPG, WEBP, GIF)
+- [x] Video upload and playback (MP4, WEBM, MKV, MOV, AVI)
+- [x] YouTube video streaming (paste a URL, it plays directly)
+- [x] Device pairing via 6-char code
+- [x] Multi-device support (multiple Fire TVs, different playlists)
+- [x] Configurable slide duration per device
+- [x] Offline image caching
+- [x] Wake lock (screen stays on)
+- [x] "Quit App" menu option
+- [x] Backend API for all management operations
+
+---
+
+## What's Next (Roadmap)
+
+- [ ] Weather widget (OpenWeatherMap integration)
+- [ ] Scrolling ticker/marquee bar
+- [ ] Content scheduling by time-of-day
+- [ ] Google Slides / web page embeds via WebView
+- [ ] RSS / news feed support
+
+---
+
+## Troubleshooting
+
+**Device shows "playlist empty":**
+- Check the backend is running: `curl http://localhost:3002/api/health`
+- Verify the device is paired: `curl http://localhost:3002/api/admin/state`
+- Check the device has content assigned in its playlist
+- Confirm the app is configured with the correct backend URL
+
+**Videos show black screen on Fire TV:**
+- This is a known screencap limitation on Amlogic hardware — the actual TV display shows the video correctly, but `adb exec-out screencap` can't capture hardware-composited frames
+- Try the TextureView rendering path if the issue persists on actual display
+
+**YouTube videos won't play:**
+- Verify `yt-dlp` is installed: `yt-dlp --version`
+- Test the stream endpoint: `curl "http://localhost:3002/api/admin/youtube/stream?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ"`
+- Stream URLs expire — they refresh each time the item comes up in the playlist
+
+**App won't pair:**
+- Make sure the pairing code shown on TV is entered within 60 seconds
+- Check the Fire TV can reach the backend: `adb shell ping <server-ip>`
