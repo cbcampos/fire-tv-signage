@@ -167,7 +167,20 @@ async function push(client, rest, global) {
     return;
   }
 
-  if (!files.length) throw new Error("push requires a file path, --from-library, --from-youtube, or --from-url");
+  if (parsed.options["from-web"] || parsed.options.fromWeb) {
+    const webUrl = String(parsed.options["from-web"] || parsed.options.fromWeb).trim();
+    if (!webUrl) throw new Error("push --from-web requires a URL");
+    const webName = parsed.options.name || parsed.options.webName || parsed.options["web-name"] || "Web Dashboard";
+    const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
+    const result = await client.post("/api/admin/library/web", { webUrl, name: webName, tags });
+    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+      libraryItemId: result.item.id
+    });
+    console.log(`✓ Web URL pushed live to ${deviceId}.`);
+    return;
+  }
+
+  if (!files.length) throw new Error("push requires a file path, --from-library, --from-web, --from-youtube, or --from-url");
 
   // Clear playlist if --clear
   if (parsed.options.clear) {
@@ -862,6 +875,7 @@ Commands:
   push <deviceId> <file>          Push image/video to display
   push --all <file>                Push to all paired devices
   push <deviceId> --from-library "tag"   Push from library
+  push <deviceId> --from-web "url" [--name N]  Push live WebView URL
   push <deviceId> --from-url "url"       Push from URL
   push <deviceId> --from-youtube "url"   Download + push YouTube
 
