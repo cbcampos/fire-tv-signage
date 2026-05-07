@@ -80,3 +80,31 @@ When Amanda Claire needs content for the week, use this framework:
 - Respond to all DMs/comments within 24h
 - Use all 3 Highlights categories: Services, Transformations, About
 - Link in bio for booking (can use linktree or direct)
+
+---
+
+## Local Dashboards (LAN, private)
+
+Dashboards served from `http://192.168.2.90:8888/` — not public.
+
+**Push to Fire TV:**
+```bash
+signage push <deviceId> --from-web "http://192.168.2.90:8888/<file>.html" --name "Title"
+```
+
+**Serve a new dashboard:**
+```bash
+cp /path/to/dashboard.html ~/.openclaw/workspace/dashboards/
+```
+
+**Start server:**
+```bash
+bash ~/.openclaw/workspace/scripts/start-dashboards.sh
+```
+
+**Available dashboards:**
+- `command-center.html` — Family Command Center (clock, weather, calendar, family panel)
+
+**Devices:**
+- Living Room Google TV: `32d814c9-1917-4cea-9041-3624c9c9fcd1`
+- Living Room Fire TV: `8e8032d5-b1b6-4733-8ea5-dc56633f36b2`

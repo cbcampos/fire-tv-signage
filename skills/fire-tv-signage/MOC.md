@@ -201,3 +201,4 @@ Display (images FIT_CENTER, videos VideoView)
 | [[library]] | Content library management |
 | [[youtube]] | YouTube download + push details |
 | [[video]] | Video playback troubleshooting |
+| [[local-dashboards]] | Push locally-hosted web dashboards over LAN |

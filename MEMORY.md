@@ -1,0 +1,92 @@
+## OpenClaw Bootstrap Memory
+
+### System
+- Host: `ccampos-Surface-Pro-6`
+- Timezone: `America/Chicago`
+- Primary agent: `main` (`Dobby`)
+- Other agents in active use: `forge`, `flaire`
+- Gateway config: `~/.openclaw/openclaw.json`
+- Gateway service: `openclaw-gateway.service`
+- Gateway restart command: `openclaw gateway restart`
+
+### Model Policy
+- Default text model: `minimax-portal/MiniMax-M2.7`
+- Active-memory model: `minimax-portal/MiniMax-M2.7-highspeed`
+- Codex is fallback only: `openai-codex/gpt-5.4`
+- Do not intentionally switch the main or cron lanes to Codex unless MiniMax is failing.
+- Confirm on-host CLI help before making operational claims or repairs.
+
+### Gateway Rules
+- Use the smallest safe non-destructive repair first.
+- Never weaken auth, expose secrets, or relax access policy.
+- Avoid live edits to cron/session stores unless there is a clear store-corruption reason and a backup exists.
+- Restarts do not create new sessions; persisted session state survives restart.
+- Browser-backed tasks can delay shutdown enough to trigger a forced systemd kill.
+
+### Current Operational State
+- OpenClaw version expected on this host: `2026.4.26`
+- Main session should remain MiniMax-first.
+- Cron jobs should run MiniMax-first.
+- `Telegram default` is known to be enabled but unconfigured.
+- mDNS/bonjour may disable itself noisily without implying gateway failure.
+- Telegram may fall back to sticky IPv4 on intermittent network issues.
+
+### Key Paths
+- Workspace: `~/.openclaw/workspace`
+- Memory archive: `~/.openclaw/workspace/memory/`
+- Incidents: `~/.openclaw/workspace/incidents/`
+- Inbox summaries: `~/.openclaw/workspace/inbox/`
+- Main session store: `~/.openclaw/agents/main/sessions/sessions.json`
+- Auth profiles: `~/.openclaw/agents/main/agent/auth-profiles.json`
+- Gateway managed env: `~/.openclaw/gateway.systemd.env`
+
+### Durable User Context
+- User: Chris Campos
+- Family: Amanda, Franklin, Mae
+- Work: Forge AHEAD Center / UAB communications
+- Primary outbound identity for assistant email: `clawdobby@gmail.com`
+- Google Workspace account for Chris operations: `chris.campos@gmail.com`
+
+### Key Integrations
+- Discord is the primary agent surface.
+- Telegram is configured for selected bots; one default account is intentionally not configured.
+- Todoist, Google Workspace, and Dropbox are active automation dependencies.
+- Nest/Google Home display workflows exist; see detailed memory files before changing device-specific behavior.
+- **Fire TV Signage:** Local dashboard server at `http://192.168.2.90:8888/` serves private dashboards over LAN. Skill: `skills/fire-tv-signage/`
+
+### Known Issues To Remember
+- `MEMORY.md` should stay compact; detailed history belongs in `memory/` files.
+- If Discord providers flap but recover on retry, treat that separately from gateway-down events.
+- If restart behavior is poor, inspect browser tasks and systemd stop timeout before assuming model failure.
+- If status surfaces disagree about MiniMax auth, check the live process environment before changing auth config.
+
+### Detailed References
+- Operational history and dated notes: `~/.openclaw/workspace/memory/`
+- Current incidents: `~/.openclaw/workspace/incidents/`
+- Gateway summaries for handoff: `~/.openclaw/workspace/inbox/`
+- Session-specific state: `~/.openclaw/workspace/memory/session-context.json`
+
+## Promoted From Short-Term Memory (2026-05-05)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-04-27.md:1:4 -->
+- ### Franklin Pickup Reminder (13:50 CST) - Calendar event title is "Pick Up Franklin from School", not "pick up franklin" - Fixed match logic: now catches both "pick up franklin" and "pick up" + "franklin" in same title [score=0.957 recalls=4 avg=0.910 source=memory/2026-04-27.md:1-4]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:6:6 -->
+- **Problem:** User lookup failed with `ERR_MODULE_NOT_FOUND: Cannot find package '@vercel/kv'` [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:6-6]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:10:10 -->
+- **Files changed:** [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:10-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:16:16 -->
+- **Also fixed:** `_clubs.js` had a double `});)` syntax error introduced during edits. [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:16-16]
+
+## Promoted From Short-Term Memory (2026-05-06)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:19:19 -->
+- **Problem:** Password reset API returned 200 but email never sent. Tested directly — 401 from Resend API. [score=0.882 recalls=0 avg=0.620 source=memory/2026-04-29.md:19-19]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:5:5 -->
+- Chris is open to Stripe Link as a future autonomous purchasing tool, with these guardrails: [score=0.860 recalls=0 avg=0.620 source=memory/2026-04-30.md:5-5]
+
+## Promoted From Short-Term Memory (2026-05-07)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:11:11 -->
+- **Use cases considered:** [score=0.879 recalls=0 avg=0.620 source=memory/2026-04-30.md:11-11]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:16:16 -->
+- **Status:** Deferred. Don't implement until a concrete use case arises where asking first is actually a blocker. Keep the idea in TOOLS.md. [score=0.873 recalls=0 avg=0.620 source=memory/2026-04-30.md:16-16]

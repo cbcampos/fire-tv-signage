@@ -1,6 +1,6 @@
 ---
 name: fire-tv-signage
-description: Manage Fire TV Signage — push content, control displays, YouTube integration, content library. Preferred: push-from-chat over browser.
+description: Manage Fire TV Signage — push content, control displays, YouTube/web integration, content library. Preferred: push-from-chat over browser.
 version: 1.1.0
 openclaw:
   skillKey: fire-tv-signage
@@ -12,7 +12,10 @@ requirements:
 
 # Fire TV Signage Skill
 
-Push images and videos to Fire TV displays directly from chat. No browser needed.
+Push images, videos, YouTube, and web dashboards to Fire TV displays directly from chat. No browser needed.
+
+For full OpenClaw agent operating procedures, read:
+- `fire-tv-signage/OPENCLAW_AGENT_GUIDE.md`
 
 ## Architecture
 - **Backend** runs on `http://192.168.2.90:3002` (port 3002)
@@ -37,6 +40,7 @@ signage push <deviceId> --from-youtube "https://youtube.com/watch?v=..."
 - [[library]] — Save, tag, search, manage reusable content
 - [[youtube]] — YouTube video download and push workflow
 - [[video]] — Video troubleshooting (moov atom, Range requests)
+- [[local-dashboards]] — Push locally-hosted web dashboards over LAN (private, no public internet)
 
 ## Backend Commands (CLI)
 ```bash
@@ -58,6 +62,12 @@ signage push <deviceId> --from-library "franklin-schedule"
 
 # Push a YouTube video
 signage push <deviceId> --from-youtube "https://youtube.com/watch?v=..."
+
+# Push a single Wyze camera live (via go2rtc stream page)
+signage push <deviceId> --from-wyze "baby_cam" --wyze-bridge "http://192.168.2.90:1984"
+
+# Save a web dashboard URL to library
+signage library add-web "https://example.com/dashboard" --name "Ops Dashboard"
 
 # Upload from URL
 signage push <deviceId> --from-url "https://example.com/image.png"
@@ -81,11 +91,16 @@ signage rename <deviceId> <imageId> --name "New Title"
 # Library management
 signage library list
 signage library add /path/to/file.jpg --tag family
+signage library add-youtube "https://youtube.com/watch?v=..." --name "Morning News"
+signage library add-web "https://example.com/dashboard" --name "Ops Dashboard"
 signage library search vacation
 signage library remove <libraryId>
 
 # YouTube download + push
 signage youtube-push "https://youtube.com/watch?v=..." <deviceId>
+
+# List available Wyze camera names from bridge
+signage wyze-cams --bridge-url "http://192.168.2.90:5080"
 
 # Show device details
 signage show <deviceId>
@@ -112,6 +127,11 @@ Downloads at 720p max, restructures moov atom for streaming, uploads to backend,
 **4. From content library:**
 ```
 signage push 60912977-a2d4-400b-b041-2f0612667051 --from-library "franklin-schedule"
+```
+
+**4b. Save a YouTube URL in library (no download):**
+```
+signage library add-youtube "https://www.youtube.com/watch?v=..." --name "Lobby Stream"
 ```
 
 **5. To ALL displays at once:**
@@ -141,6 +161,11 @@ signage library search franklin
 # Push from library to any device
 signage push <deviceId> --from-library "family-vacation"
 ```
+
+Notes:
+- Library supports `image`, `video`, `youtube`, and `web` item types.
+- `signage push <deviceId> --from-library <youtube-or-web-item>` pushes that item as a live override on the target device.
+- Working Wyze bridge path is `ghcr.io/idisposable/docker-wyze-bridge:latest` with host networking.
 
 Library items are stored in `~/.openclaw/workspace/fire-tv-signage/backend/data/library/` and tracked in `db.json`.
 
