@@ -109,147 +109,634 @@
       "label": "Fire TV Signage",
       "token": "k72krFLvzMeWa_rwgQjo2OvOnTP4f30W",
       "approvedAt": "2026-05-05T17:34:54.282Z"
+    },
+    "MJBBTE": {
+      "code": "MJBBTE",
+      "label": "Chris's 5th TV",
+      "paired": true,
+      "token": "xjfMGTkqvlgGdhssV5oZP6JicCdpl1-H",
+      "approvedAt": "2026-05-06T18:03:32.395Z",
+      "deviceId": "8ae99931-be46-45ce-9882-7c14690491a5",
+      "name": "Chris's 5th TV",
+      "lastSeenAt": "2026-05-06T18:05:40.270Z"
+    },
+    "AAKFW9": {
+      "code": "AAKFW9",
+      "paired": true,
+      "seenAt": "2026-05-06T18:07:43.272Z",
+      "deviceId": "78cecc9b-f30b-4d58-af41-4c4a59dcaf4c",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-06T18:07:49.269Z",
+      "label": "Chris's 5th TV",
+      "token": "VZtYB0Rf2ZjIls6TkyggIe_O5urRMwBT",
+      "approvedAt": "2026-05-06T18:07:49.073Z"
+    },
+    "QEZ4TD": {
+      "code": "QEZ4TD",
+      "paired": true,
+      "seenAt": "2026-05-06T18:16:42.585Z",
+      "deviceId": "fd57d401-43a7-4364-a1cf-0bd7a24e79a0",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-06T18:16:51.519Z",
+      "label": "Fire TV Signage",
+      "token": "Wjn-NnmGCqTkuGiVXWocAq2842rtWP_0",
+      "approvedAt": "2026-05-06T18:16:50.845Z"
+    },
+    "YVUGT4": {
+      "code": "YVUGT4",
+      "paired": true,
+      "seenAt": "2026-05-06T19:42:31.739Z",
+      "deviceId": "56d805bd-0b22-4c56-b5fa-1d9843737de6",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-06T19:42:49.919Z",
+      "label": "New Living Room",
+      "token": "ApCKHERpNsUPjqw2wPoW3CqLdEtpm1WZ",
+      "approvedAt": "2026-05-06T19:42:47.464Z"
+    },
+    "WGAXNM": {
+      "code": "WGAXNM",
+      "paired": true,
+      "seenAt": "2026-05-06T20:38:25.717Z",
+      "deviceId": "8e8032d5-b1b6-4733-8ea5-dc56633f36b2",
+      "name": "ChrisÂ Campos's 5th TV",
+      "lastSeenAt": "2026-05-06T20:39:16.756Z",
+      "label": "New Living Room",
+      "token": "3RCOM1s4olSN1x5e9zgDTP_GbhMUwkeo",
+      "approvedAt": "2026-05-06T20:39:14.303Z"
     }
   },
   "devices": {
-    "d82e6065-8395-4cf7-9863-6294159661bb": {
-      "id": "d82e6065-8395-4cf7-9863-6294159661bb",
-      "label": "Fire TV Living Room",
-      "token": "-LJZWsAfT6z5bdYMZs5rygxxdOjnBhwK",
+    "8e8032d5-b1b6-4733-8ea5-dc56633f36b2": {
+      "id": "8e8032d5-b1b6-4733-8ea5-dc56633f36b2",
+      "label": "New Living Room",
+      "token": "3RCOM1s4olSN1x5e9zgDTP_GbhMUwkeo",
       "delaySeconds": 10,
       "images": [
         {
-          "id": "48549c87-ef7d-4e89-806e-fa9904b5abce",
-          "name": "firetv_screen.png",
+          "id": "274afadb-c74b-4919-b303-fb3d85aafffb",
+          "name": "21_seurat_gravelines.png",
           "mime": "image/png",
-          "path": "/uploads/48549c87-ef7d-4e89-806e-fa9904b5abce.png",
-          "createdAt": "2026-05-05T16:06:01.972Z"
-        }
-      ],
-      "createdAt": "2026-05-05T16:05:21.963Z",
-      "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T16:09:51.684Z"
-    },
-    "6b7ef819-1945-47d2-870a-b1422d3dcc2b": {
-      "id": "6b7ef819-1945-47d2-870a-b1422d3dcc2b",
-      "label": "Fire TV Living Room",
-      "token": "X2S7SA85ywKJys6gqzGervONEYE2wwNB",
-      "delaySeconds": 10,
-      "images": [
-        {
-          "id": "9850406c-7ef6-4342-a3e6-e4b0468fb46d",
-          "name": "firetv_screen.png",
-          "mime": "image/png",
-          "path": "/uploads/9850406c-7ef6-4342-a3e6-e4b0468fb46d.png",
-          "createdAt": "2026-05-05T16:28:49.003Z"
+          "path": "/uploads/274afadb-c74b-4919-b303-fb3d85aafffb.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:40.843Z"
         },
         {
-          "id": "bca4fd53-f9b4-437a-9118-7d97fa29a1b2",
-          "name": "firetv_logo.png",
+          "id": "2c1ac829-ab52-4013-8744-ec5bcac31f0f",
+          "name": "22_seurat_seine.png",
           "mime": "image/png",
-          "path": "/uploads/bca4fd53-f9b4-437a-9118-7d97fa29a1b2.png",
-          "createdAt": "2026-05-05T16:43:26.306Z"
-        }
-      ],
-      "createdAt": "2026-05-05T16:28:07.438Z",
-      "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T16:44:03.713Z"
-    },
-    "test": {
-      "id": "test",
-      "label": "Fire TV Living Room",
-      "token": "X2S7SA85ywKJys6gqzGervONEYE2wwNB",
-      "delaySeconds": 10,
-      "images": [],
-      "createdAt": "2026-05-05T16:31:23.491Z",
-      "name": "test",
-      "lastSeenAt": "2026-05-05T16:31:23.491Z"
-    },
-    "c8fddc51-29a3-4ed0-b8f6-25cd4760c4ef": {
-      "id": "c8fddc51-29a3-4ed0-b8f6-25cd4760c4ef",
-      "label": "Fire TV Signage",
-      "token": "TjqblwyIGgkvm5N6w7GWQ5LO_Y3Ccknr",
-      "delaySeconds": 10,
-      "images": [
-        {
-          "id": "9f5e528b-dae6-48ca-8b44-fe03fbd1ab21",
-          "name": "firetv_logo.png",
-          "mime": "image/png",
-          "path": "/uploads/9f5e528b-dae6-48ca-8b44-fe03fbd1ab21.png",
-          "createdAt": "2026-05-05T16:52:08.538Z"
+          "path": "/uploads/2c1ac829-ab52-4013-8744-ec5bcac31f0f.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:41.150Z"
         },
         {
-          "id": "e82030ea-187e-41b8-aa68-6709449b81d6",
-          "name": "e077a41e-ee5a-4a45-8b87-45ba5ef913e4.png",
+          "id": "de0888d6-e7c8-48f2-ac19-c911ab052708",
+          "name": "24_monet_grenouillere.png",
           "mime": "image/png",
-          "path": "/uploads/e82030ea-187e-41b8-aa68-6709449b81d6.png",
-          "createdAt": "2026-05-05T17:24:09.598Z"
-        }
-      ],
-      "createdAt": "2026-05-05T16:51:27.984Z",
-      "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T17:35:16.490Z"
-    },
-    "9b9d72e0-fa01-4609-b64e-97a3a2639a9e": {
-      "id": "9b9d72e0-fa01-4609-b64e-97a3a2639a9e",
-      "label": "Fire TV Signage",
-      "token": "0E8MYyJcjAgqeRbPC2CcxJB1mgEsoa9g",
-      "delaySeconds": 10,
-      "images": [
-        {
-          "id": "ea13ea81-2dfc-493c-9204-fee2ee648977",
-          "name": "firetv_logo.png",
-          "mime": "image/png",
-          "path": "/uploads/ea13ea81-2dfc-493c-9204-fee2ee648977.png",
-          "createdAt": "2026-05-05T17:12:40.952Z"
-        }
-      ],
-      "createdAt": "2026-05-05T17:11:03.282Z",
-      "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T17:11:03.349Z"
-    },
-    "adde6c94-f65d-41a6-a4c6-08f69c63f874": {
-      "id": "adde6c94-f65d-41a6-a4c6-08f69c63f874",
-      "label": "Fire TV Signage",
-      "token": "Xf-0FKloxrdWSK4viPlpcnhnX68HdnIB",
-      "delaySeconds": 10,
-      "images": [
-        {
-          "id": "0e70306e-7b77-4918-af3a-0ccbe1af33ca",
-          "name": "firetv_logo.png",
-          "mime": "image/png",
-          "path": "/uploads/0e70306e-7b77-4918-af3a-0ccbe1af33ca.png",
-          "createdAt": "2026-05-05T17:15:40.180Z"
-        }
-      ],
-      "createdAt": "2026-05-05T17:15:04.291Z",
-      "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T17:33:00.357Z"
-    },
-    "60912977-a2d4-400b-b041-2f0612667051": {
-      "id": "60912977-a2d4-400b-b041-2f0612667051",
-      "label": "Fire TV Signage",
-      "token": "k72krFLvzMeWa_rwgQjo2OvOnTP4f30W",
-      "delaySeconds": 10,
-      "images": [
-        {
-          "id": "ea50f3ca-ca8d-4f15-af0a-13b7baa876b2",
-          "name": "firetv_logo.png",
-          "mime": "image/png",
-          "path": "/uploads/ea50f3ca-ca8d-4f15-af0a-13b7baa876b2.png",
-          "createdAt": "2026-05-05T17:39:06.832Z"
+          "path": "/uploads/de0888d6-e7c8-48f2-ac19-c911ab052708.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:41.458Z"
         },
         {
-          "id": "627f26e9-d5a7-4d22-9c03-9415245b270a",
-          "name": "e077a41e-ee5a-4a45-8b87-45ba5ef913e4.png",
+          "id": "107a5e6e-143c-4d52-af60-aee93e0c886f",
+          "name": "25_monet_lilies_1906.png",
           "mime": "image/png",
-          "path": "/uploads/627f26e9-d5a7-4d22-9c03-9415245b270a.png",
-          "createdAt": "2026-05-05T17:39:10.049Z"
+          "path": "/uploads/107a5e6e-143c-4d52-af60-aee93e0c886f.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:41.879Z"
+        },
+        {
+          "id": "4c3b1bb3-ac9a-4e45-bbb8-6d1c26d92504",
+          "name": "25_monet_lilies.png",
+          "mime": "image/png",
+          "path": "/uploads/4c3b1bb3-ac9a-4e45-bbb8-6d1c26d92504.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:42.228Z"
+        },
+        {
+          "id": "5bb38a55-8e8d-43de-ba66-b9d8a0ec21e9",
+          "name": "26_monet_vetheuil.png",
+          "mime": "image/png",
+          "path": "/uploads/5bb38a55-8e8d-43de-ba66-b9d8a0ec21e9.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:42.455Z"
+        },
+        {
+          "id": "343847b0-3c0c-4b30-8218-beb56d2a2c57",
+          "name": "27_monet_parliament.png",
+          "mime": "image/png",
+          "path": "/uploads/343847b0-3c0c-4b30-8218-beb56d2a2c57.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:42.749Z"
+        },
+        {
+          "id": "1c158bbd-212d-40e6-a709-4ac9a4e6e31b",
+          "name": "28_monet_argenteuil.png",
+          "mime": "image/png",
+          "path": "/uploads/1c158bbd-212d-40e6-a709-4ac9a4e6e31b.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:43.032Z"
+        },
+        {
+          "id": "dd3b6356-8b7a-4d70-8e14-b00fdddeae4d",
+          "name": "29_monet_poppies.png",
+          "mime": "image/png",
+          "path": "/uploads/dd3b6356-8b7a-4d70-8e14-b00fdddeae4d.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:51:43.299Z"
         }
       ],
-      "createdAt": "2026-05-05T17:34:57.069Z",
+      "createdAt": "2026-05-06T20:39:16.756Z",
       "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-05T18:03:09.154Z"
+      "lastSeenAt": "2026-05-07T02:11:43.925Z",
+      "activePlaylistId": "bbba1c16-2612-43a3-8518-9f52b4fe8cb7",
+      "liveOverride": null
     }
-  }
+  },
+  "library": [
+    {
+      "id": "03ec7364-f4ea-49cf-868e-747477050f3a",
+      "name": "AC Affirmation",
+      "type": "image",
+      "tags": [
+        "migrated",
+        "direct-display"
+      ],
+      "path": "/uploads/b4544424-eb12-409d-819f-667587c50678.png",
+      "size": 0,
+      "addedAt": "2026-05-06T19:19:00.598Z"
+    },
+    {
+      "id": "584ec9c9-afc9-4fa4-9001-31daf581c2ae",
+      "name": "Campos Welcome",
+      "type": "image",
+      "tags": [],
+      "path": "/uploads/584ec9c9-afc9-4fa4-9001-31daf581c2ae.png",
+      "size": 2655352,
+      "addedAt": "2026-05-06T19:26:12.229Z"
+    },
+    {
+      "id": "8c44eee9-88b3-461f-8e5d-28139a9b0b21",
+      "name": "Fireplace Loop",
+      "type": "video",
+      "tags": [],
+      "path": "/uploads/8c44eee9-88b3-461f-8e5d-28139a9b0b21.mp4",
+      "size": 19322857,
+      "addedAt": "2026-05-06T19:45:20.770Z"
+    },
+    {
+      "id": "5a9e3448-ca66-4e4b-8b75-05d4890e5c8b",
+      "name": "birds-replacement.mp4",
+      "type": "video",
+      "tags": [],
+      "path": "/uploads/5a9e3448-ca66-4e4b-8b75-05d4890e5c8b.mp4",
+      "size": 2047746,
+      "addedAt": "2026-05-06T20:14:32.008Z"
+    },
+    {
+      "id": "e29d33b0-e130-48ec-9e6c-c707dfec782d",
+      "name": "Imogen Heap - The Happy Song",
+      "type": "youtube",
+      "youtubeUrl": "https://www.youtube.com/watch?v=9PhtxqKLvVc",
+      "tags": [],
+      "addedAt": "2026-05-06T20:22:31.017Z"
+    }
+  ],
+  "playlists": [
+    {
+      "id": "393d8124-5b5d-4196-b642-14ff7caa1f16",
+      "name": "Testing",
+      "items": [
+        {
+          "id": "df2957d5-b7b3-4cec-91da-4d5b4e710e4f",
+          "name": "Campos Welcome",
+          "path": "/uploads/584ec9c9-afc9-4fa4-9001-31daf581c2ae.png",
+          "isVideo": false,
+          "isYouTube": false,
+          "youtubeUrl": null,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T20:47:48.644Z"
+        }
+      ],
+      "createdAt": "2026-05-06T19:21:48.072Z",
+      "updatedAt": "2026-05-07T01:17:28.945Z"
+    },
+    {
+      "id": "96b8dfa8-8ee9-4cd2-a618-154b5f7d123e",
+      "name": "Birds Live",
+      "items": [
+        {
+          "id": "803a0439-3670-411f-853a-7db8513c3163",
+          "name": "birds-replacement.mp4",
+          "path": "/uploads/5a9e3448-ca66-4e4b-8b75-05d4890e5c8b.mp4",
+          "isVideo": true,
+          "isYouTube": false,
+          "youtubeUrl": null,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T20:14:45.630Z"
+        }
+      ],
+      "createdAt": "2026-05-06T20:13:30.452Z",
+      "updatedAt": "2026-05-06T21:41:45.259Z"
+    },
+    {
+      "id": "184b4640-17ea-4262-a4f5-1a1201f3e905",
+      "name": "Videos",
+      "items": [
+        {
+          "id": "8f13ae03-cb37-4f11-b769-775977859e01",
+          "name": "Imogen Heap - The Happy Song",
+          "isVideo": false,
+          "isYouTube": true,
+          "youtubeUrl": "https://www.youtube.com/watch?v=9PhtxqKLvVc",
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T20:24:50.471Z"
+        }
+      ],
+      "createdAt": "2026-05-06T20:24:40.113Z",
+      "updatedAt": "2026-05-06T20:24:50.471Z"
+    },
+    {
+      "id": "8f9062f5-e7a1-454d-b9be-45fe19e8fa73",
+      "name": "Default",
+      "items": [
+        {
+          "id": "9b657624-3048-4069-8cf5-b7f1530fe48a",
+          "name": "AC Affirmation",
+          "path": "/uploads/b4544424-eb12-409d-819f-667587c50678.png",
+          "isVideo": false,
+          "isYouTube": false,
+          "youtubeUrl": null,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T20:47:45.948Z"
+        }
+      ],
+      "createdAt": "2026-05-06T20:47:38.228Z",
+      "updatedAt": "2026-05-06T20:47:45.948Z"
+    },
+    {
+      "id": "a0926ab3-5172-40f9-8310-23272b954686",
+      "name": "Paintings Gallery 16x9",
+      "items": [
+        {
+          "id": "33397174-87c8-41d0-bf7f-bfe5e75635f7",
+          "name": "01_starry_night.png",
+          "mime": "image/png",
+          "path": "/uploads/33397174-87c8-41d0-bf7f-bfe5e75635f7.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:32.474Z"
+        },
+        {
+          "id": "1022f7c7-a99f-4653-8d85-76640402e679",
+          "name": "02_girl_pearl_earring.png",
+          "mime": "image/png",
+          "path": "/uploads/1022f7c7-a99f-4653-8d85-76640402e679.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:32.649Z"
+        },
+        {
+          "id": "5164b697-4b66-4386-adc4-54940cbc8ce1",
+          "name": "03_great_wave.png",
+          "mime": "image/png",
+          "path": "/uploads/5164b697-4b66-4386-adc4-54940cbc8ce1.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:32.876Z"
+        },
+        {
+          "id": "085957aa-9a66-417e-965a-5944fdcec999",
+          "name": "04_persistence_memory.png",
+          "mime": "image/png",
+          "path": "/uploads/085957aa-9a66-417e-965a-5944fdcec999.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:33.086Z"
+        },
+        {
+          "id": "54d0805a-8413-43e6-b807-e062e20af41f",
+          "name": "05_birth_venus.png",
+          "mime": "image/png",
+          "path": "/uploads/54d0805a-8413-43e6-b807-e062e20af41f.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:33.293Z"
+        },
+        {
+          "id": "27cd99b3-c828-4da7-ba43-68ca94135b0f",
+          "name": "06_scream.png",
+          "mime": "image/png",
+          "path": "/uploads/27cd99b3-c828-4da7-ba43-68ca94135b0f.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:33.469Z"
+        },
+        {
+          "id": "227ecbb1-8c1e-4212-97a7-b21726de8468",
+          "name": "07_water_lilies.png",
+          "mime": "image/png",
+          "path": "/uploads/227ecbb1-8c1e-4212-97a7-b21726de8468.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:33.714Z"
+        },
+        {
+          "id": "d4043345-58da-4a8c-8df1-8d0d2fa159b0",
+          "name": "08_kiss_klimt.png",
+          "mime": "image/png",
+          "path": "/uploads/d4043345-58da-4a8c-8df1-8d0d2fa159b0.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:33.944Z"
+        },
+        {
+          "id": "66147723-1187-4cfd-a547-05ea57134839",
+          "name": "09_nighthawks.png",
+          "mime": "image/png",
+          "path": "/uploads/66147723-1187-4cfd-a547-05ea57134839.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:34.126Z"
+        },
+        {
+          "id": "17b24fe7-6434-45e5-ab23-35cbf5b93cb8",
+          "name": "10_american_gothic.png",
+          "mime": "image/png",
+          "path": "/uploads/17b24fe7-6434-45e5-ab23-35cbf5b93cb8.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:34.321Z"
+        },
+        {
+          "id": "dbbecde1-8366-4f68-ad6a-ea30a5149a44",
+          "name": "11_whistlers_mother.png",
+          "mime": "image/png",
+          "path": "/uploads/dbbecde1-8366-4f68-ad6a-ea30a5149a44.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:34.561Z"
+        },
+        {
+          "id": "77fe096f-e10d-4ebe-a876-9f563e285ab6",
+          "name": "12_grande_jatte.png",
+          "mime": "image/png",
+          "path": "/uploads/77fe096f-e10d-4ebe-a876-9f563e285ab6.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:34.805Z"
+        },
+        {
+          "id": "dc0f5daf-612c-4d6c-b94c-688d4bc0bf4d",
+          "name": "13_night_watch.png",
+          "mime": "image/png",
+          "path": "/uploads/dc0f5daf-612c-4d6c-b94c-688d4bc0bf4d.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.012Z"
+        },
+        {
+          "id": "8e18e3d8-875d-4c00-8de9-e27b6e690287",
+          "name": "14_mona_lisa.png",
+          "mime": "image/png",
+          "path": "/uploads/8e18e3d8-875d-4c00-8de9-e27b6e690287.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.223Z"
+        },
+        {
+          "id": "b20a4e3f-8b87-441e-a3c9-2441cc3eaac7",
+          "name": "15_impression_sunrise.png",
+          "mime": "image/png",
+          "path": "/uploads/b20a4e3f-8b87-441e-a3c9-2441cc3eaac7.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.433Z"
+        },
+        {
+          "id": "b19b1921-7fb6-4571-a2f1-c9b6ec2898ac",
+          "name": "16_son_of_man.png",
+          "mime": "image/png",
+          "path": "/uploads/b19b1921-7fb6-4571-a2f1-c9b6ec2898ac.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.570Z"
+        },
+        {
+          "id": "690ef4eb-7409-43f4-a447-57c0c3e08afb",
+          "name": "17_wanderer.png",
+          "mime": "image/png",
+          "path": "/uploads/690ef4eb-7409-43f4-a447-57c0c3e08afb.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.734Z"
+        },
+        {
+          "id": "b12efc74-db73-4201-8ee4-7d5906801cf6",
+          "name": "18_liberty.png",
+          "mime": "image/png",
+          "path": "/uploads/b12efc74-db73-4201-8ee4-7d5906801cf6.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:35.915Z"
+        },
+        {
+          "id": "230fbc05-f1d1-4109-9499-ba4f65a7cd19",
+          "name": "19_impression_sunrise.png",
+          "mime": "image/png",
+          "path": "/uploads/230fbc05-f1d1-4109-9499-ba4f65a7cd19.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:36.125Z"
+        },
+        {
+          "id": "b5b519e0-b515-4f3b-83b3-f9331820f749",
+          "name": "20_liberty.png",
+          "mime": "image/png",
+          "path": "/uploads/b5b519e0-b515-4f3b-83b3-f9331820f749.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-06T21:44:36.323Z"
+        },
+        {
+          "id": "a6eb3eb1-ffe8-442b-a99d-aecc50795fbd",
+          "name": "21_seurat_gravelines.png",
+          "mime": "image/png",
+          "path": "/uploads/a6eb3eb1-ffe8-442b-a99d-aecc50795fbd.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:11.167Z"
+        },
+        {
+          "id": "2b1c2538-8f29-4795-8a03-de9f6ec1037e",
+          "name": "22_seurat_seine.png",
+          "mime": "image/png",
+          "path": "/uploads/2b1c2538-8f29-4795-8a03-de9f6ec1037e.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:11.399Z"
+        },
+        {
+          "id": "798ce334-54bc-417a-9c7b-bf24a73c5a4e",
+          "name": "24_monet_grenouillere.png",
+          "mime": "image/png",
+          "path": "/uploads/798ce334-54bc-417a-9c7b-bf24a73c5a4e.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:11.640Z"
+        },
+        {
+          "id": "951f3ed5-3b7a-4100-9c74-44c6437da25d",
+          "name": "25_monet_lilies.png",
+          "mime": "image/png",
+          "path": "/uploads/951f3ed5-3b7a-4100-9c74-44c6437da25d.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:12.127Z"
+        },
+        {
+          "id": "d8ce31c0-c12a-431b-9971-ee3651cc55e2",
+          "name": "26_monet_vetheuil.png",
+          "mime": "image/png",
+          "path": "/uploads/d8ce31c0-c12a-431b-9971-ee3651cc55e2.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:12.320Z"
+        },
+        {
+          "id": "22f2642d-150a-4c5a-818b-6e876b079c8c",
+          "name": "27_monet_parliament.png",
+          "mime": "image/png",
+          "path": "/uploads/22f2642d-150a-4c5a-818b-6e876b079c8c.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:12.585Z"
+        },
+        {
+          "id": "f03a5ea6-e60d-4e91-abee-4504cf4a0f3e",
+          "name": "28_monet_argenteuil.png",
+          "mime": "image/png",
+          "path": "/uploads/f03a5ea6-e60d-4e91-abee-4504cf4a0f3e.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:12.835Z"
+        },
+        {
+          "id": "a01d72f4-def0-4290-b46d-ea99fd2794e3",
+          "name": "29_monet_poppies.png",
+          "mime": "image/png",
+          "path": "/uploads/a01d72f4-def0-4290-b46d-ea99fd2794e3.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:50:13.052Z"
+        }
+      ],
+      "createdAt": "2026-05-06T21:44:30.897Z",
+      "updatedAt": "2026-05-07T02:14:09.100Z"
+    },
+    {
+      "id": "3d992571-00c8-41a8-b198-99d209881f73",
+      "name": "Real Paintings 16x9",
+      "items": [],
+      "createdAt": "2026-05-07T01:50:47.044Z",
+      "updatedAt": "2026-05-07T01:50:47.044Z"
+    },
+    {
+      "id": "bbba1c16-2612-43a3-8518-9f52b4fe8cb7",
+      "name": "New Paintings",
+      "items": [
+        {
+          "id": "c2daf36b-2dda-453d-baae-c695d39af1d0",
+          "name": "21_seurat_gravelines.png",
+          "mime": "image/png",
+          "path": "/uploads/c2daf36b-2dda-453d-baae-c695d39af1d0.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:22.123Z"
+        },
+        {
+          "id": "5a6b3d65-0520-46a4-a956-d4623791bad9",
+          "name": "22_seurat_seine.png",
+          "mime": "image/png",
+          "path": "/uploads/5a6b3d65-0520-46a4-a956-d4623791bad9.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:22.430Z"
+        },
+        {
+          "id": "ec484598-c7b0-4e2c-be34-4feca05ed015",
+          "name": "24_monet_grenouillere.png",
+          "mime": "image/png",
+          "path": "/uploads/ec484598-c7b0-4e2c-be34-4feca05ed015.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:22.675Z"
+        },
+        {
+          "id": "342fb7ea-fce8-46b2-beb8-c4112f48c31f",
+          "name": "25_monet_lilies_1906.png",
+          "mime": "image/png",
+          "path": "/uploads/342fb7ea-fce8-46b2-beb8-c4112f48c31f.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:22.981Z"
+        },
+        {
+          "id": "021474a3-b8f8-434b-b494-4bf88791409d",
+          "name": "25_monet_lilies.png",
+          "mime": "image/png",
+          "path": "/uploads/021474a3-b8f8-434b-b494-4bf88791409d.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:23.254Z"
+        },
+        {
+          "id": "ae822e18-cd8a-4c4d-8c8d-c3549f81e877",
+          "name": "26_monet_vetheuil.png",
+          "mime": "image/png",
+          "path": "/uploads/ae822e18-cd8a-4c4d-8c8d-c3549f81e877.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:23.567Z"
+        },
+        {
+          "id": "296d8c04-991f-4c72-a798-fac021c818be",
+          "name": "27_monet_parliament.png",
+          "mime": "image/png",
+          "path": "/uploads/296d8c04-991f-4c72-a798-fac021c818be.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:23.977Z"
+        },
+        {
+          "id": "c6df8180-f06c-4135-85b0-7a06c28233ba",
+          "name": "28_monet_argenteuil.png",
+          "mime": "image/png",
+          "path": "/uploads/c6df8180-f06c-4135-85b0-7a06c28233ba.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:24.254Z"
+        },
+        {
+          "id": "7b6bf27d-4697-4f0f-ae5a-efbda5dc2d40",
+          "name": "29_monet_poppies.png",
+          "mime": "image/png",
+          "path": "/uploads/7b6bf27d-4697-4f0f-ae5a-efbda5dc2d40.png",
+          "isVideo": false,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T01:52:24.517Z"
+        }
+      ],
+      "createdAt": "2026-05-07T01:52:15.026Z",
+      "updatedAt": "2026-05-07T01:52:24.517Z"
+    }
+  ]
 }

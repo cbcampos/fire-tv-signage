@@ -3,12 +3,12 @@
 ## Periodic Checks (rotate through these ~4x/day)
 
 - **Email** — Run `python3 ~/.openclaw/workspace/scripts/email_monitor_formatter.py`. 
-  - If output contains 🏥 MEDICAL or urgent categories → send to Discord channel 1470900732931735697
+  - If output contains 🏥 MEDICAL or urgent categories → `message send` to Discord channel 1470900732931735697
   - If output is "No priority emails found." → reply HEARTBEAT_OK
-  - Otherwise reply with a brief summary to Discord 1470900732931735697
+  - Otherwise `message send` a brief summary to Discord channel 1470900732931735697 (NOT just reply in DM)
 
 - **Calendar** — Run `python3 ~/.openclaw/workspace/scripts/calendar-heartbeat.py`
-  - If events in next 4h → brief heads up to Discord
+  - If events in next 4h → `message send` brief heads up to Discord channel 1470900732931735697
   - Otherwise HEARTBEAT_OK
 
 - **Weather** — Only check if relevant (plans mentioned, outdoor activities)

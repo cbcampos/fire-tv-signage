@@ -13,6 +13,7 @@ const DB_PATH = path.join(DATA_DIR, "db.json");
 const PORT = Number(process.env.PORT || 3002);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
+const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -68,7 +69,9 @@ async function routeApi(req, res, url) {
   if (req.method === "GET" && parts[1] === "weather") {
     const city = String(url.searchParams.get("city") || "Birmingham,AL").trim();
     try {
-      const response = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+      const response = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, {
+        signal: AbortSignal.timeout(8000)
+      });
       if (!response.ok) throw new Error(`wttr.in returned ${response.status}`);
       const data = await response.json();
       // Normalize current conditions
@@ -134,6 +137,178 @@ async function routeApi(req, res, url) {
     return;
   }
 
+  // ── Named playlists ─────────────────────────────────────────────────────
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && !parts[3]) {
+    const body = await readJson(req);
+    const name = String(body.name || "Untitled playlist").trim().slice(0, 120) || "Untitled playlist";
+    const playlist = {
+      id: crypto.randomUUID(),
+      name,
+      items: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    db.playlists.push(playlist);
+    saveDb();
+    sendJson(res, 200, { ok: true, playlist });
+    return;
+  }
+
+  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && !parts[4]) {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const body = await readJson(req);
+    if (body.name !== undefined) playlist.name = String(body.name).trim().slice(0, 120) || playlist.name;
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, playlist });
+    return;
+  }
+
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && !parts[4]) {
+    const idx = db.playlists.findIndex((playlist) => playlist.id === parts[3]);
+    if (idx === -1) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const [playlist] = db.playlists.splice(idx, 1);
+    for (const device of Object.values(db.devices)) {
+      if (device.activePlaylistId === playlist.id) device.activePlaylistId = null;
+    }
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && !parts[5]) {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const body = await readJson(req, 30 * 1024 * 1024);
+    const item = saveDataUrlImage(body.name, body.dataUrl);
+    playlist.items.push(item);
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && parts[5] === "from-library") {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const body = await readJson(req);
+    const libraryItem = db.library.find((entry) => entry.id === body.libraryItemId);
+    if (!libraryItem) { sendJson(res, 404, { error: "Library item not found." }); return; }
+    const item = {
+      id: crypto.randomUUID(),
+      name: libraryItem.name,
+      path: libraryItem.path,
+      isVideo: libraryItem.type === "video",
+      isYouTube: libraryItem.type === "youtube",
+      youtubeUrl: libraryItem.youtubeUrl || null,
+      delaySeconds: null,
+      createdAt: new Date().toISOString()
+    };
+    playlist.items.push(item);
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && parts[5] === "copy") {
+    const targetPlaylist = findPlaylist(parts[3]);
+    if (!targetPlaylist) { sendJson(res, 404, { error: "Target playlist not found." }); return; }
+    const body = await readJson(req);
+    let sourceItem = null;
+    if (body.sourcePlaylistId) {
+      const sourcePlaylist = findPlaylist(body.sourcePlaylistId);
+      if (!sourcePlaylist) { sendJson(res, 404, { error: "Source playlist not found." }); return; }
+      sourceItem = sourcePlaylist.items.find((entry) => entry.id === body.sourceItemId);
+    } else if (body.sourceDeviceId) {
+      const sourceDevice = db.devices[body.sourceDeviceId];
+      if (!sourceDevice) { sendJson(res, 404, { error: "Source device not found." }); return; }
+      sourceItem = (sourceDevice.images || []).find((entry) => entry.id === body.sourceItemId);
+    } else {
+      sendJson(res, 400, { error: "sourcePlaylistId or sourceDeviceId is required." });
+      return;
+    }
+    if (!sourceItem) { sendJson(res, 404, { error: "Source item not found." }); return; }
+    const item = {
+      ...sourceItem,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString()
+    };
+    targetPlaylist.items.push(item);
+    targetPlaylist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "youtube") {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const body = await readJson(req);
+    const youtubeUrl = String(body.youtubeUrl || "").trim();
+    if (!youtubeUrl.match(/youtube\.com|youtu\.be/)) {
+      sendJson(res, 400, { error: "Valid YouTube URL required." });
+      return;
+    }
+    try {
+      await extractPlayableYouTubeStream(youtubeUrl);
+    } catch (error) {
+      sendJson(res, 400, { error: `YouTube URL is not playable: ${error.message}` });
+      return;
+    }
+    const item = {
+      id: crypto.randomUUID(),
+      name: String(body.name || "YouTube Video").trim().slice(0, 120) || "YouTube Video",
+      youtubeUrl,
+      isYouTube: true,
+      delaySeconds: null,
+      createdAt: new Date().toISOString()
+    };
+    playlist.items.push(item);
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && parts[5]) {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const item = playlist.items.find((entry) => entry.id === parts[5]);
+    if (!item) { sendJson(res, 404, { error: "Playlist item not found." }); return; }
+    const body = await readJson(req);
+    if (body.name !== undefined) item.name = String(body.name).trim().slice(0, 120) || item.name;
+    if (body.delaySeconds !== undefined) item.delaySeconds = body.delaySeconds === null ? null : clamp(Number(body.delaySeconds), 2, 3600);
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && parts[5] === "reorder") {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    const body = await readJson(req);
+    if (!Array.isArray(body.order)) { sendJson(res, 400, { error: "order must be an array of item ids" }); return; }
+    const reorderMap = new Map(body.order.map((id, i) => [id, i]));
+    playlist.items.sort((a, b) => (reorderMap.get(a.id) ?? 999) - (reorderMap.get(b.id) ?? 999));
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "playlists" && parts[3] && parts[4] === "items" && parts[5]) {
+    const playlist = findPlaylist(parts[3]);
+    if (!playlist) { sendJson(res, 404, { error: "Playlist not found." }); return; }
+    playlist.items = playlist.items.filter((item) => item.id !== parts[5]);
+    playlist.updatedAt = new Date().toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
   if (req.method === "POST" && parts[1] === "admin" && parts[2] === "pair") {
     const body = await readJson(req);
     const code = cleanPairingCode(body.code);
@@ -162,6 +337,12 @@ async function routeApi(req, res, url) {
     const { youtubeUrl, name } = body || {};
     if (!youtubeUrl || !youtubeUrl.match(/youtube\.com|youtu\.be/)) {
       sendJson(res, 400, { error: "Valid YouTube URL required." });
+      return;
+    }
+    try {
+      await extractPlayableYouTubeStream(String(youtubeUrl).trim());
+    } catch (error) {
+      sendJson(res, 400, { error: `YouTube URL is not playable: ${error.message}` });
       return;
     }
     const device = db.devices[parts[3]];
@@ -197,8 +378,8 @@ async function routeApi(req, res, url) {
   }
 
   // ── Library ────────────────────────────────────────────────────────────────
-  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library") {
-    const body = await readJson(req);
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library" && !parts[3]) {
+    const body = await readJson(req, 30 * 1024 * 1024);
     if (!body.dataUrl) { sendJson(res, 400, { error: "dataUrl required" }); return; }
     const image = saveDataUrlImage(body.name || "library-item", body.dataUrl);
     const item = {
@@ -216,16 +397,45 @@ async function routeApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library" && parts[3] === "youtube") {
+    const body = await readJson(req);
+    const youtubeUrl = String(body.youtubeUrl || "").trim();
+    if (!youtubeUrl.match(/youtube\.com|youtu\.be/)) {
+      sendJson(res, 400, { error: "Valid YouTube URL required." });
+      return;
+    }
+    try {
+      await extractPlayableYouTubeStream(youtubeUrl);
+    } catch (error) {
+      sendJson(res, 400, { error: `YouTube URL is not playable: ${error.message}` });
+      return;
+    }
+    const item = {
+      id: crypto.randomUUID(),
+      name: String(body.name || "YouTube Video").trim().slice(0, 120) || "YouTube Video",
+      type: "youtube",
+      youtubeUrl,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      addedAt: new Date().toISOString()
+    };
+    db.library.push(item);
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
   if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "library" && parts[3]) {
     const id = parts[3];
     const idx = db.library.findIndex((i) => i.id === id);
     if (idx === -1) { sendJson(res, 404, { error: "Not found" }); return; }
     const item = db.library[idx];
     // Remove actual file
-    try {
-      const filePath = path.join(UPLOAD_DIR, path.basename(item.path));
-      if (existsSync(filePath)) fs.unlinkSync(filePath);
-    } catch {}
+    if (item.path) {
+      try {
+        const filePath = path.join(UPLOAD_DIR, path.basename(item.path));
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch {}
+    }
     db.library.splice(idx, 1);
     saveDb();
     sendJson(res, 200, { ok: true });
@@ -239,58 +449,31 @@ async function routeApi(req, res, url) {
     return;
   }
 
+  if (req.method === "PATCH" && parts[1] === "admin" && parts[2] === "library" && parts[3]) {
+    const item = db.library.find((i) => i.id === parts[3]);
+    if (!item) { sendJson(res, 404, { error: "Not found" }); return; }
+    const body = await readJson(req);
+    if (body.name !== undefined) {
+      const nextName = String(body.name || "").trim().slice(0, 120);
+      if (!nextName) { sendJson(res, 400, { error: "name is required" }); return; }
+      item.name = nextName;
+    }
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
   // ── YouTube stream proxy ────────────────────────────────────────────────
   if (req.method === "GET" && parts[1] === "admin" && parts[2] === "youtube" && parts[3] === "stream") {
     const youtubeUrl = String(url.searchParams.get("url") || "").trim();
     if (!youtubeUrl) { sendJson(res, 400, { error: "url parameter required" }); return; }
     if (!youtubeUrl.match(/youtube\.com|youtu\.be/)) { sendJson(res, 400, { error: "Invalid YouTube URL" }); return; }
-    // Use yt-dlp to get the best direct stream URL
-    const ytdlp = spawn("yt-dlp", ["-J", "--no-download", youtubeUrl], { timeout: 15000 });
-    let output = "";
-    let errorOutput = "";
-    ytdlp.stdout.on("data", (d) => (output += d));
-    ytdlp.stderr.on("data", (d) => (errorOutput += d));
-    ytdlp.on("close", (code) => {
-      if (code !== 0) {
-        console.error("yt-dlp error:", errorOutput.slice(-200));
-        sendJson(res, 502, { error: "Failed to extract YouTube stream", detail: errorOutput.slice(-100) });
-        return;
-      }
-      try {
-        const info = JSON.parse(output);
-        // Get a direct video URL from requested_formats or formats
-        const formats = info.requested_formats || info.formats || [];
-        // Find best MP4 or webm video+audio combo
-        const videoFormats = formats.filter(f => f.vcodec && f.acodec && (f.ext === "mp4" || f.ext === "webm"));
-        // Pick highest quality
-        videoFormats.sort((a, b) => (b.width || 0) - (a.width || 0));
-        const best = videoFormats[0];
-        if (!best || !best.url) {
-          // Fallback: try to get any format with a URL
-          const anyWithUrl = formats.find(f => f.url && f.ext === "mp4");
-          if (anyWithUrl) {
-            sendJson(res, 200, {
-              streamUrl: anyWithUrl.url,
-              title: info.title,
-              duration: info.duration,
-              expiresAt: anyWithUrl.url.includes("expire=") ? extractExpire(anyWithUrl.url) : null
-            });
-          } else {
-            sendJson(res, 502, { error: "No playable format found" });
-          }
-          return;
-        }
-        sendJson(res, 200, {
-          streamUrl: best.url,
-          title: info.title,
-          duration: info.duration,
-          expiresAt: best.url.includes("expire=") ? extractExpire(best.url) : null
-        });
-      } catch (e) {
-        sendJson(res, 502, { error: "Failed to parse yt-dlp output", detail: e.message });
-      }
-    });
-    ytdlp.on("error", (e) => { sendJson(res, 502, { error: "yt-dlp process error", detail: e.message }); });
+    try {
+      const result = await extractPlayableYouTubeStream(youtubeUrl);
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendJson(res, 502, { error: "Failed to extract YouTube stream", detail: error.message });
+    }
     return;
   }
 
@@ -303,6 +486,111 @@ async function routeApi(req, res, url) {
     if (body.delaySeconds !== undefined) device.delaySeconds = clamp(Number(body.delaySeconds), 2, 3600);
     saveDb();
     sendJson(res, 200, { ok: true, device });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "live") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req);
+    const playlistId = body.playlistId ? String(body.playlistId) : null;
+    if (playlistId && !findPlaylist(playlistId)) {
+      sendJson(res, 404, { error: "Playlist not found." });
+      return;
+    }
+    if (!playlistId) {
+      sendJson(res, 400, { error: "playlistId is required. Direct display live is no longer supported." });
+      return;
+    }
+    device.activePlaylistId = playlistId;
+    device.liveOverride = null;
+    saveDb();
+    sendJson(res, 200, { ok: true, device });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "migrate-direct-to-library") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const moved = [];
+    for (const item of [...(device.images || []), ...(device.videos || [])]) {
+      if (!item?.path) continue;
+      db.library.push({
+        id: crypto.randomUUID(),
+        name: item.name || "Migrated Item",
+        type: item.isVideo ? "video" : "image",
+        tags: ["migrated", "direct-display"],
+        path: item.path,
+        size: 0,
+        addedAt: new Date().toISOString()
+      });
+      moved.push(item.id);
+    }
+    device.images = [];
+    device.videos = [];
+    saveDb();
+    sendJson(res, 200, { ok: true, movedCount: moved.length });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "override") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req, 30 * 1024 * 1024);
+    const item = saveDataUrlImage(body.name, body.dataUrl);
+    device.liveOverride = item;
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "override-existing") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req);
+    const sourcePlaylist = findPlaylist(body.sourcePlaylistId);
+    if (!sourcePlaylist) { sendJson(res, 404, { error: "Source playlist not found." }); return; }
+    const sourceItem = sourcePlaylist.items.find((entry) => entry.id === body.sourceItemId);
+    if (!sourceItem) { sendJson(res, 404, { error: "Source item not found." }); return; }
+    const item = {
+      ...sourceItem,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString()
+    };
+    device.liveOverride = item;
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "override-library") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req);
+    const libraryItem = db.library.find((entry) => entry.id === body.libraryItemId);
+    if (!libraryItem) { sendJson(res, 404, { error: "Library item not found." }); return; }
+    const item = {
+      id: crypto.randomUUID(),
+      name: libraryItem.name,
+      path: libraryItem.path,
+      isVideo: libraryItem.type === "video",
+      isYouTube: libraryItem.type === "youtube",
+      youtubeUrl: libraryItem.youtubeUrl || null,
+      delaySeconds: null,
+      createdAt: new Date().toISOString()
+    };
+    device.liveOverride = item;
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "override") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    device.liveOverride = null;
+    saveDb();
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -447,16 +735,14 @@ function handleReceiverPlaylist(req, res, url, deviceId) {
   }
   device.lastSeenAt = new Date().toISOString();
   saveDb();
-  const items = [];
-  for (const img of (device.images || [])) {
-    items.push({ id: img.id, name: img.name, type: "image", url: img.path });
-  }
-  for (const vid of (device.videos || [])) {
-    if (vid.isYouTube) {
-      items.push({ id: vid.id, name: vid.name, type: "youtube", youtubeUrl: vid.youtubeUrl });
-    } else {
-      items.push({ id: vid.id, name: vid.name, type: "video", url: vid.path });
-    }
+  let items = [];
+  if (device.liveOverride) {
+    items = [normalizePlaylistItem(device.liveOverride)];
+  } else if (device.activePlaylistId) {
+    const playlist = findPlaylist(device.activePlaylistId);
+    items = (playlist?.items || []).map(normalizePlaylistItem);
+  } else {
+    items = [];
   }
   sendJson(res, 200, { delaySeconds: device.delaySeconds, items, images: items });
 }
@@ -469,7 +755,8 @@ function adminState(req) {
       .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))),
     devices: Object.values(db.devices)
       .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))),
-    library: db.library
+    library: db.library,
+    playlists: db.playlists
   };
 }
 
@@ -481,7 +768,7 @@ function saveDataUrlImage(name, dataUrl) {
   const mime = match[1].toLowerCase();
   const isVideo = mime.startsWith("video/");
   const ext = isVideo
-    ? mime.includes("mkv") ? "mkv" : mime.includes("webm") ? "webm" : mime.includes("mov") ? "mov" : mime.includes("avi") ? "avi" : "mp4"
+    ? mime.includes("mkv") ? "mkv" : mime.includes("webm") ? "webm" : mime.includes("quicktime") ? "mov" : mime.includes("avi") ? "avi" : "mp4"
     : mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
   const id = crypto.randomUUID();
   const filename = `${id}.${ext}`;
@@ -501,10 +788,22 @@ function saveDataUrlImage(name, dataUrl) {
 function loadDb() {
   try {
     const data = JSON.parse(fs.readFileSync(DB_PATH, "utf8"));
+    if (!data.pairingCodes || typeof data.pairingCodes !== "object") data.pairingCodes = {};
+    if (!data.devices || typeof data.devices !== "object") data.devices = {};
     if (!data.library) data.library = [];
+    if (!data.playlists) data.playlists = [];
+    for (const device of Object.values(data.devices)) {
+      if (!Array.isArray(device.images)) device.images = [];
+      if (!Array.isArray(device.videos)) device.videos = [];
+      if (device.activePlaylistId === undefined) device.activePlaylistId = null;
+      if (device.liveOverride === undefined) device.liveOverride = null;
+    }
+    for (const playlist of data.playlists) {
+      if (!Array.isArray(playlist.items)) playlist.items = [];
+    }
     return data;
   } catch {
-    return { pairingCodes: {}, devices: {}, library: [] };
+    return { pairingCodes: {}, devices: {}, library: [], playlists: [] };
   }
 }
 
@@ -515,6 +814,68 @@ function saveDb() {
 function extractExpire(url) {
   const m = /[?&]expire=(\d+)/.exec(url);
   return m ? new Date(Number(m[1]) * 1000).toISOString() : null;
+}
+
+async function extractPlayableYouTubeStream(youtubeUrl) {
+  const { output, errorOutput } = await runYtDlpJson(youtubeUrl);
+  let info;
+  try {
+    info = JSON.parse(output);
+  } catch (error) {
+    throw new Error(`Failed to parse yt-dlp output: ${error.message}`);
+  }
+
+  const formats = info.formats || info.requested_formats || [];
+  const muxed = formats.filter((f) => f && f.url && f.vcodec && f.acodec && f.vcodec !== "none" && f.acodec !== "none");
+  const best = muxed
+    .filter((f) => f.ext === "mp4" && String(f.vcodec || "").startsWith("avc1") && String(f.acodec || "").includes("mp4a"))
+    .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+    || muxed
+      .filter((f) => f.ext === "mp4" && !String(f.vcodec || "").includes("av01"))
+      .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+    || muxed
+      .filter((f) => f.ext === "mp4")
+      .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+    || muxed
+      .filter((f) => f.ext === "webm")
+      .sort((a, b) => (b.height || 0) - (a.height || 0))[0]
+    || formats.find((f) => f && f.url && f.ext === "mp4")
+    || null;
+
+  if (!best?.url) {
+    const tail = String(errorOutput || "").trim().split("\n").slice(-1)[0];
+    throw new Error(tail || "No playable format found");
+  }
+
+  return {
+    streamUrl: best.url,
+    title: info.title,
+    duration: info.duration,
+    expiresAt: best.url.includes("expire=") ? extractExpire(best.url) : null
+  };
+}
+
+function runYtDlpJson(youtubeUrl) {
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn(
+      YTDLP_BIN,
+      ["--js-runtimes", "node", "--remote-components", "ejs:github", "-J", "--no-download", youtubeUrl],
+      { timeout: 20000 }
+    );
+    let output = "";
+    let errorOutput = "";
+    ytdlp.stdout.on("data", (d) => (output += d));
+    ytdlp.stderr.on("data", (d) => (errorOutput += d));
+    ytdlp.on("close", (code) => {
+      if (code !== 0) {
+        const detail = String(errorOutput || "").trim().split("\n").slice(-1)[0];
+        reject(new Error(detail || "yt-dlp exited with non-zero status"));
+        return;
+      }
+      resolve({ output, errorOutput });
+    });
+    ytdlp.on("error", (error) => reject(new Error(`yt-dlp process error: ${error.message}`)));
+  });
 }
 
 function cleanPairingCode(input) {
@@ -542,6 +903,27 @@ function publicBase(req) {
 
 function uploadFilePath(publicPath) {
   return path.join(UPLOAD_DIR, String(publicPath).replace(/^\/uploads\//, ""));
+}
+
+function findPlaylist(id) {
+  return db.playlists.find((playlist) => playlist.id === id);
+}
+
+function normalizePlaylistItem(item) {
+  if (item.isYouTube) {
+    return { id: item.id, name: item.name, type: "youtube", youtubeUrl: item.youtubeUrl, delaySeconds: item.delaySeconds ?? null };
+  }
+  if (item.isVideo) {
+    return { id: item.id, name: item.name, type: "video", url: item.path, delaySeconds: item.delaySeconds ?? null };
+  }
+  return { id: item.id, name: item.name, type: "image", url: item.path, delaySeconds: item.delaySeconds ?? null };
+}
+
+function deviceItems(device) {
+  const items = [];
+  for (const img of (device.images || [])) items.push(normalizePlaylistItem(img));
+  for (const vid of (device.videos || [])) items.push(normalizePlaylistItem(vid));
+  return items;
 }
 
 async function readJson(req, maxBytes = 1024 * 1024) {
@@ -600,15 +982,22 @@ function serveFile(res, filePath, start, end) {
     ".3gp": "video/3gpp"
   }[ext] || "application/octet-stream";
 
-  if (start !== undefined && end !== undefined) {
-    const length = end - start + 1;
+  if (start !== undefined) {
+    let safeStart = Number.isFinite(start) ? Math.max(0, start) : 0;
+    let safeEnd = Number.isFinite(end) ? Math.min(end, stat.size - 1) : stat.size - 1;
+    if (safeStart > safeEnd || safeStart >= stat.size) {
+      res.writeHead(416, { "Content-Range": `bytes */${stat.size}` });
+      res.end();
+      return;
+    }
+    const length = safeEnd - safeStart + 1;
     res.writeHead(206, {
       "Content-Type": type,
       "Accept-Ranges": "bytes",
       "Content-Length": length,
-      "Content-Range": `bytes ${start}-${end}/${stat.size}`
+      "Content-Range": `bytes ${safeStart}-${safeEnd}/${stat.size}`
     });
-    fs.createReadStream(resolved, { start, end }).pipe(res);
+    fs.createReadStream(resolved, { start: safeStart, end: safeEnd }).pipe(res);
   } else {
     res.writeHead(200, { "Content-Type": type, "Accept-Ranges": "bytes", "Content-Length": stat.size });
     fs.createReadStream(resolved).pipe(res);

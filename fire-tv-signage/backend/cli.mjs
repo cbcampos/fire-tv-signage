@@ -6,7 +6,8 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const DEFAULT_BASE_URL = process.env.SIGNAGE_URL || "http://127.0.0.1:3002";
-const LIBRARY_DIR = path.join(process.env.SIGNAGE_DATA_DIR || join("~/.openclaw/workspace/fire-tv-signage/backend", "data"), "library");
+const DEFAULT_DATA_DIR = path.join(process.env.HOME || "", ".openclaw", "workspace", "fire-tv-signage", "backend", "data");
+const LIBRARY_DIR = path.join(process.env.SIGNAGE_DATA_DIR || DEFAULT_DATA_DIR, "library");
 
 const args = process.argv.slice(2);
 
@@ -69,6 +70,39 @@ async function main() {
     case "library":
       await library(client, rest);
       return;
+    case "playlists":
+      await playlists(client, rest);
+      return;
+    case "playlist-item-add":
+      await playlistItemAdd(client, rest);
+      return;
+    case "playlist-item-add-library":
+      await playlistItemAddLibrary(client, rest);
+      return;
+    case "playlist-item-copy":
+      await playlistItemCopy(client, rest);
+      return;
+    case "playlist-item-remove":
+      await playlistItemRemove(client, rest);
+      return;
+    case "live":
+      await setLive(client, rest);
+      return;
+    case "override":
+      await pushOverride(client, rest);
+      return;
+    case "override-existing":
+      await pushExistingOverride(client, rest);
+      return;
+    case "override-library":
+      await pushLibraryOverride(client, rest);
+      return;
+    case "live-item":
+      await pushLiveItem(client, rest);
+      return;
+    case "override-clear":
+      await clearOverride(client, rest);
+      return;
     case "youtube-push":
       await youtubePush(client, rest, global);
       return;
@@ -96,7 +130,11 @@ async function push(client, rest, global) {
     }
     const source = await resolveSource(client, files, parsed.options, global.url);
     for (const dev of state.devices) {
-      await addToDevice(client, dev.id, source);
+      if (source?.kind === "library") {
+        await addLibraryItemToDevice(client, dev.id, source.item, global.url);
+      } else {
+        throw new Error("push --all currently supports --from-library");
+      }
       console.log(`→ ${dev.label || dev.id}`);
     }
     console.log(`Pushed to ${state.devices.length} device(s).`);
@@ -110,7 +148,7 @@ async function push(client, rest, global) {
 
   if (parsed.options.fromLibrary) {
     const item = await findLibraryItem(client, parsed.options.fromLibrary);
-    await addToDevice(client, deviceId, item);
+    await addLibraryItemToDevice(client, deviceId, item, global.url);
     console.log(`✓ Added "${item.name}" from library to playlist.`);
     return;
   }
@@ -360,7 +398,7 @@ async function clearPlaylist(client, rest, global) {
 
 async function resolveSource(client, files, options, baseUrl) {
   if (options.fromLibrary) {
-    return findLibraryItem(client, options.fromLibrary);
+    return { kind: "library", item: await findLibraryItem(client, options.fromLibrary) };
   }
   return null;
 }
@@ -387,6 +425,201 @@ async function addToDevice(client, deviceId, item) {
     dataUrl: null,
     libraryId: item.id  // server-side: copy from library
   });
+}
+
+async function addLibraryItemToDevice(client, deviceId, libraryItem, baseUrl) {
+  const sourceUrl = libraryItem.path.startsWith("http")
+    ? libraryItem.path
+    : `${baseUrl.replace(/\/$/, "")}${libraryItem.path}`;
+  const response = await fetch(sourceUrl);
+  if (!response.ok) throw new Error(`Failed to fetch library item: ${response.status}`);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const mime = libraryItem.type === "video" ? "video/mp4" : "image/png";
+  const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/images`, {
+    name: libraryItem.name,
+    dataUrl
+  });
+}
+
+// ─── Playlists ────────────────────────────────────────────────────────────────
+
+async function playlists(client, rest) {
+  const [action, ...tail] = rest;
+  const parsed = parseOptions(tail);
+  if (!action || action === "list") {
+    const state = await client.state();
+    const rows = (state.playlists || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      items: String((p.items || []).length),
+      updatedAt: p.updatedAt || ""
+    }));
+    if (!rows.length) { console.log("No playlists."); return; }
+    printRows(["id", "name", "items", "updatedAt"], rows);
+    return;
+  }
+  if (action === "create") {
+    const name = parsed.positionals.join(" ") || parsed.options.name || "Untitled playlist";
+    const result = await client.post("/api/admin/playlists", { name });
+    console.log(`✓ Created playlist ${result.playlist.id} (${result.playlist.name})`);
+    return;
+  }
+  if (action === "rename") {
+    const id = required(parsed.positionals[0], "playlists rename <playlistId> --name 'New Name'");
+    const name = required(parsed.options.name, "playlists rename requires --name");
+    await client.patch(`/api/admin/playlists/${encodeURIComponent(id)}`, { name });
+    console.log("✓ Playlist renamed.");
+    return;
+  }
+  if (action === "delete") {
+    const id = required(parsed.positionals[0], "playlists delete <playlistId>");
+    await client.delete(`/api/admin/playlists/${encodeURIComponent(id)}`);
+    console.log("✓ Playlist deleted.");
+    return;
+  }
+  if (action === "show") {
+    const id = required(parsed.positionals[0], "playlists show <playlistId>");
+    const state = await client.state();
+    const playlist = (state.playlists || []).find((p) => p.id === id);
+    if (!playlist) throw new Error(`Playlist not found: ${id}`);
+    console.log(`id: ${playlist.id}`);
+    console.log(`name: ${playlist.name}`);
+    console.log(`items: ${(playlist.items || []).length}`);
+    if (playlist.items?.length) {
+      printRows(["id", "name", "type", "delay"],
+        playlist.items.map((item) => ({
+          id: item.id,
+          name: item.name || "",
+          type: item.isYouTube ? "YOUTUBE" : item.isVideo ? "VIDEO" : "IMAGE",
+          delay: item.delaySeconds ? `${item.delaySeconds}s` : "global"
+        }))
+      );
+    }
+    return;
+  }
+  throw new Error(`Unknown playlists action: ${action}`);
+}
+
+async function playlistItemAdd(client, rest) {
+  const parsed = parseOptions(rest);
+  const playlistId = required(parsed.positionals[0], "playlist-item-add <playlistId> <file>");
+  const file = required(parsed.positionals[1], "playlist-item-add <playlistId> <file>");
+  if (!existsSync(file)) throw new Error(`File not found: ${file}`);
+  const ext = path.extname(file).toLowerCase();
+  const isVideo = [".mp4", ".mkv", ".mov", ".webm", ".avi", ".3gp"].includes(ext);
+  const mime = isVideo
+    ? "video/mp4"
+    : { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" }[ext] || "image/png";
+  const data = await fs.readFile(file);
+  const dataUrl = `data:${mime};base64,${data.toString("base64")}`;
+  await client.post(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items`, {
+    name: path.basename(file),
+    dataUrl
+  });
+  console.log("✓ Added file to playlist.");
+}
+
+async function playlistItemAddLibrary(client, rest) {
+  const parsed = parseOptions(rest);
+  const playlistId = required(parsed.positionals[0], "playlist-item-add-library <playlistId> <libraryItemId>");
+  const libraryItemId = required(parsed.positionals[1], "playlist-item-add-library <playlistId> <libraryItemId>");
+  await client.post(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/from-library`, { libraryItemId });
+  console.log("✓ Added library item to playlist.");
+}
+
+async function playlistItemCopy(client, rest) {
+  const parsed = parseOptions(rest);
+  const targetPlaylistId = required(parsed.positionals[0], "playlist-item-copy <targetPlaylistId> --item ITEM_ID [--source-playlist ID|--source-device ID]");
+  const sourceItemId = required(parsed.options.item, "playlist-item-copy requires --item ITEM_ID");
+  const body = { sourceItemId };
+  if (parsed.options["source-playlist"]) body.sourcePlaylistId = parsed.options["source-playlist"];
+  if (parsed.options["source-device"]) body.sourceDeviceId = parsed.options["source-device"];
+  if (!body.sourcePlaylistId && !body.sourceDeviceId) {
+    throw new Error("playlist-item-copy requires --source-playlist or --source-device");
+  }
+  await client.post(`/api/admin/playlists/${encodeURIComponent(targetPlaylistId)}/items/copy`, body);
+  console.log("✓ Copied item to playlist.");
+}
+
+async function playlistItemRemove(client, rest) {
+  const playlistId = required(rest[0], "playlist-item-remove <playlistId> <itemId>");
+  const itemId = required(rest[1], "playlist-item-remove <playlistId> <itemId>");
+  await client.delete(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/${encodeURIComponent(itemId)}`);
+  console.log("✓ Removed playlist item.");
+}
+
+async function setLive(client, rest) {
+  const parsed = parseOptions(rest);
+  const deviceId = required(parsed.positionals[0], "live <deviceId> [--playlist PLAYLIST_ID|--direct]");
+  const playlistId = parsed.options.direct ? null : (parsed.options.playlist || null);
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/live`, { playlistId });
+  console.log(`✓ Live source updated (${playlistId ? "playlist" : "direct"}).`);
+}
+
+async function pushOverride(client, rest) {
+  const deviceId = required(rest[0], "override <deviceId> <file>");
+  const file = required(rest[1], "override <deviceId> <file>");
+  if (!existsSync(file)) throw new Error(`File not found: ${file}`);
+  const ext = path.extname(file).toLowerCase();
+  const isVideo = [".mp4", ".mkv", ".mov", ".webm", ".avi", ".3gp"].includes(ext);
+  const mime = isVideo
+    ? "video/mp4"
+    : { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" }[ext] || "image/png";
+  const data = await fs.readFile(file);
+  const dataUrl = `data:${mime};base64,${data.toString("base64")}`;
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override`, {
+    name: path.basename(file),
+    dataUrl
+  });
+  console.log("✓ Override pushed live.");
+}
+
+async function pushExistingOverride(client, rest) {
+  const parsed = parseOptions(rest);
+  const deviceId = required(parsed.positionals[0], "override-existing <deviceId> --playlist PLAYLIST_ID --item ITEM_ID");
+  const sourcePlaylistId = required(parsed.options.playlist, "override-existing requires --playlist");
+  const sourceItemId = required(parsed.options.item, "override-existing requires --item");
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-existing`, {
+    sourcePlaylistId,
+    sourceItemId
+  });
+  console.log("✓ Existing item pushed live as override.");
+}
+
+async function pushLibraryOverride(client, rest) {
+  const parsed = parseOptions(rest);
+  const deviceId = required(parsed.positionals[0], "override-library <deviceId> <libraryItemId>");
+  const libraryItemId = required(parsed.positionals[1] || parsed.options.item, "override-library requires <libraryItemId> or --item");
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, { libraryItemId });
+  console.log("✓ Library item pushed live as override.");
+}
+
+async function pushLiveItem(client, rest) {
+  const parsed = parseOptions(rest);
+  const deviceId = required(parsed.positionals[0], "live-item <deviceId> (--library LIB_ID | --playlist PLAYLIST_ID --item ITEM_ID)");
+  if (parsed.options.library) {
+    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+      libraryItemId: parsed.options.library
+    });
+    console.log("✓ Library item pushed live.");
+    return;
+  }
+  if (parsed.options.playlist && parsed.options.item) {
+    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-existing`, {
+      sourcePlaylistId: parsed.options.playlist,
+      sourceItemId: parsed.options.item
+    });
+    console.log("✓ Playlist item pushed live.");
+    return;
+  }
+  throw new Error("live-item requires --library LIB_ID OR --playlist PLAYLIST_ID --item ITEM_ID");
+}
+
+async function clearOverride(client, rest) {
+  const deviceId = required(rest[0], "override-clear <deviceId>");
+  await client.delete(`/api/admin/devices/${encodeURIComponent(deviceId)}/override`);
+  console.log("✓ Override cleared.");
 }
 
 async function uploadFile(client, deviceId, file, opts = {}) {
@@ -645,6 +878,23 @@ Commands:
   library add <file> --tag NAME    Add to library
   library remove <id>              Remove from library
   library search <query>           Search library
+
+  playlists list                   List named playlists
+  playlists create "Name"          Create playlist
+  playlists show <playlistId>      Show playlist items
+  playlists rename <id> --name N   Rename playlist
+  playlists delete <id>            Delete playlist
+  playlist-item-add <playlistId> <file>              Add file to playlist
+  playlist-item-add-library <playlistId> <libraryId> Add library item to playlist
+  playlist-item-copy <targetPlaylistId> --item ITEM_ID --source-playlist ID|--source-device ID
+  playlist-item-remove <playlistId> <itemId>         Remove playlist item
+  live <deviceId> --playlist PLAYLIST_ID|--direct    Set what is live
+  override <deviceId> <file>                         Push single-item live override
+  override-existing <deviceId> --playlist ID --item ITEM_ID
+  override-library <deviceId> <libraryItemId>       Push library item live as override
+  live-item <deviceId> --library LIB_ID             Push library item live
+  live-item <deviceId> --playlist P --item I        Push playlist item live
+  override-clear <deviceId>                          Clear live override
 
   youtube-push <url> <deviceId>    Download YouTube and push
 `);

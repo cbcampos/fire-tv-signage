@@ -12,7 +12,7 @@ const els = {
   emptyWorkspaceTemplate: document.querySelector("#emptyWorkspaceTemplate")
 };
 
-let state = { devices: [], pendingPairings: [], baseUrl: "" };
+let state = { devices: [], pendingPairings: [], playlists: [], baseUrl: "" };
 let selectedDeviceId = localStorage.getItem("selectedDeviceId") || "";
 let refreshTimer = null;
 let activeEditImageId = null;
@@ -62,8 +62,14 @@ function render() {
   document.body.dataset.hasDisplays = state.devices.length ? "true" : "false";
   renderPending();
   renderDevices();
-  // Only re-render workspace if not mid-edit (to avoid wiping inputs)
-  if (!activeEditImageId && !document.querySelector(".edit-image-name[name='saving']")) {
+  // Skip workspace re-render while the user is actively editing form fields.
+  // Background polling runs every 5s and would otherwise reset in-progress edits.
+  const active = document.activeElement;
+  const isTypingInWorkspace =
+    !!active &&
+    els.displayWorkspace.contains(active) &&
+    ["INPUT", "SELECT", "TEXTAREA"].includes(active.tagName);
+  if (!activeEditImageId && !isTypingInWorkspace) {
     renderWorkspace();
   }
 }
@@ -100,13 +106,16 @@ function renderDevices() {
     const status = displayStatus(device.lastSeenAt);
     const active = device.id === selectedDeviceId ? " active" : "";
     return `
-      <button class="display-row${active}" type="button" data-device="${escapeHtml(device.id)}">
-        <span class="display-name">
-          <strong>${escapeHtml(device.label || "Signage Display")}</strong>
-          <span class="meta">${Number(device.images?.length || 0)} images - ${Number(device.delaySeconds || 10)}s</span>
-        </span>
-        <span class="status-pill ${status.className}"><span aria-hidden="true"></span>${status.label}</span>
-      </button>
+      <div class="display-row-wrap${active}">
+        <button class="display-row${active}" type="button" data-device="${escapeHtml(device.id)}">
+          <span class="display-name">
+            <strong>${escapeHtml(device.label || "Signage Display")}</strong>
+            <span class="meta">${liveLabel(device)} - ${Number(device.delaySeconds || 10)}s</span>
+          </span>
+          <span class="status-pill ${status.className}"><span aria-hidden="true"></span>${status.label}</span>
+        </button>
+        <button class="danger display-delete-button" type="button" data-delete-device="${escapeHtml(device.id)}" title="Delete display">Delete</button>
+      </div>
     `;
   }).join("");
 
@@ -115,6 +124,20 @@ function renderDevices() {
       selectedDeviceId = button.dataset.device;
       persistSelectedDevice();
       render();
+    });
+  });
+
+  els.devices.querySelectorAll("[data-delete-device]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const deviceId = button.dataset.deleteDevice;
+      const device = state.devices.find((entry) => entry.id === deviceId);
+      if (!device) return;
+      const ok = window.confirm(`Delete display "${device.label || device.id}"?\n\nThis removes the device record and any direct-uploaded items.`);
+      if (!ok) return;
+      await runAction("Deleting display", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
+        await loadState({ keepStatus: true });
+      });
     });
   });
 }
@@ -140,6 +163,19 @@ function renderWorkspace() {
       <span class="status-pill ${status.className}"><span aria-hidden="true"></span>${status.label}</span>
     </div>
 
+    <section class="playlist live-preview-top" aria-labelledby="livePreviewTitle">
+      <div class="playlist-head">
+        <h2 id="livePreviewTitle">Live Preview</h2>
+        <span class="meta">${escapeHtml(livePreviewLabel(device))} - ${effectiveLiveItems(device).length} item(s)</span>
+      </div>
+      <div class="live-preview live-preview-compact">
+        ${renderLivePreviewHero(device)}
+        <div class="playlist-strip">
+          ${renderLivePreviewItems(device)}
+        </div>
+      </div>
+    </section>
+
     <form id="settingsForm" class="settings-grid">
       <label>
         Display name
@@ -155,30 +191,146 @@ function renderWorkspace() {
       </label>
       <button type="submit">Save</button>
     </form>
+    <div class="danger-zone">
+      <button id="deleteDisplayButton" class="danger" type="button">Delete This Display</button>
+      <span class="meta">Use this to remove stale or retired displays.</span>
+    </div>
 
-    <form id="uploadForm" class="upload-zone">
-      <label>
-        Images & Video
-        <input id="imageUpload" type="file" accept="image/*,video/mp4,video/webm,video/mkv,video/x-matroska,video/quicktime,video/x-msvideo" multiple>
-      </label>
-      <button type="submit">Push to Display</button>
-    </form>
-
-    <section class="playlist" aria-labelledby="playlistTitle">
-      <div class="playlist-head">
-        <h2 id="playlistTitle">Playlist</h2>
-        <span class="meta">${device.images?.length || 0} items - ${Number(device.delaySeconds || 10)}s delay</span>
+    <section class="playlist-manager" aria-labelledby="playlistManagerTitle">
+      <div class="playlist-manager-head">
+        <div>
+          <h2 id="playlistManagerTitle">Live Playlists</h2>
+          <p class="meta">Create reusable playlists, choose what is live, or override the screen with one item.</p>
+        </div>
+        <span class="live-badge">${escapeHtml(liveLabel(device))}</span>
       </div>
-      <div id="playlistContainer"></div>
+
+      <div class="playlist-controls">
+        <form id="createPlaylistForm" class="compact-form">
+          <label>
+            New playlist
+            <input id="newPlaylistName" placeholder="Morning playlist">
+          </label>
+          <button type="submit">Create</button>
+        </form>
+
+        <form id="pushLiveForm" class="compact-form override-form">
+          <label>
+            Push live source
+            <select id="pushLiveType">
+              <option value="playlist" ${device.liveOverride ? "" : "selected"}>Playlist</option>
+              <option value="library">Single library item</option>
+            </select>
+          </label>
+          <label id="pushLivePlaylistWrap">
+            Playlist
+            <select id="pushLivePlaylistId">
+              ${state.playlists.map((playlist) => `<option value="${escapeAttr(playlist.id)}" ${playlist.id === device.activePlaylistId ? "selected" : ""}>${escapeHtml(playlist.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label id="pushLiveLibraryWrap" style="display:none;">
+            Library item
+            <select id="pushLiveLibraryId">
+              ${state.library.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
+            </select>
+          </label>
+          <button type="submit">Push Live</button>
+          <button id="clearOverrideButton" class="secondary" type="button" ${device.liveOverride ? "" : "disabled"}>Clear Override</button>
+        </form>
+
+        <form id="playlistUploadForm" class="compact-form">
+          <label>
+            Add content to playlist
+            <select id="playlistUploadTarget">
+              ${state.playlists.map((playlist) => `<option value="${escapeAttr(playlist.id)}">${escapeHtml(playlist.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            File
+            <input id="playlistUploadFile" type="file" accept="image/*,video/mp4,video/webm,video/mkv,video/x-matroska,video/quicktime,video/x-msvideo">
+          </label>
+          <button type="submit" ${state.playlists.length ? "" : "disabled"}>Add</button>
+        </form>
+
+        <form id="playlistCopyForm" class="compact-form">
+          <label>
+            Copy existing content
+            <select id="playlistCopySource">
+              ${state.playlists.map((playlist) => `<option value="${escapeAttr(playlist.id)}">${escapeHtml(playlist.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            Item
+            <select id="playlistCopyItem"></select>
+          </label>
+          <label>
+            To playlist
+            <select id="playlistCopyTarget">
+              ${state.playlists.map((playlist) => `<option value="${escapeAttr(playlist.id)}">${escapeHtml(playlist.name)}</option>`).join("")}
+            </select>
+          </label>
+          <button type="submit" ${state.playlists.length ? "" : "disabled"}>Copy</button>
+        </form>
+
+      </div>
+
+      <div class="playlist-library">
+        ${renderPlaylistCards(device)}
+      </div>
+      <div class="playlist-library">
+        ${renderPlaylistItemManagers()}
+      </div>
+    </section>
+
+    <section class="playlist-manager" aria-labelledby="libraryTitle">
+      <div class="playlist-manager-head">
+        <div>
+          <h2 id="libraryTitle">Library</h2>
+          <p class="meta">Upload once, then add items from library to any playlist.</p>
+        </div>
+      </div>
+      <div class="playlist-controls">
+        <form id="libraryUploadForm" class="compact-form">
+          <label>
+            Upload to library
+            <input id="libraryUploadFile" type="file" accept="image/*,video/mp4,video/webm,video/mkv,video/x-matroska,video/quicktime,video/x-msvideo">
+          </label>
+          <button type="submit">Upload</button>
+        </form>
+        <form id="libraryYoutubeForm" class="compact-form">
+          <label>
+            Add YouTube URL to library
+            <input id="libraryYoutubeUrl" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+          </label>
+          <label>
+            Name (optional)
+            <input id="libraryYoutubeName" placeholder="YouTube Video">
+          </label>
+          <button type="submit">Add URL</button>
+        </form>
+        <form id="libraryToPlaylistForm" class="compact-form">
+          <label>
+            Library item
+            <select id="libraryItemSelect">
+              ${state.library.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            To playlist
+            <select id="libraryTargetPlaylist">
+              ${state.playlists.map((playlist) => `<option value="${escapeAttr(playlist.id)}">${escapeHtml(playlist.name)}</option>`).join("")}
+            </select>
+          </label>
+          <button type="submit" ${state.library.length && state.playlists.length ? "" : "disabled"}>Add to Playlist</button>
+        </form>
+      </div>
+      <div class="playlist-library">
+        ${renderLibraryCards()}
+      </div>
     </section>
   `;
 
   bindWorkspace(device);
-  const playlistContainer = document.querySelector("#playlistContainer");
-  if (playlistContainer) {
-    const playlist = renderPlaylist(device);
-    playlistContainer.replaceWith(playlist);
-  }
 }
 
 function renderPlaylist(device) {
@@ -199,14 +351,14 @@ function renderPlaylist(device) {
     // Drag handle
     const handle = document.createElement("div");
     handle.className = "drag-handle";
-    handle.textContent = "⠿";
+    handle.textContent = "::";
     handle.title = "Drag to reorder";
 
     // Preview
     const preview = document.createElement("div");
     preview.className = `asset-preview${image.isVideo ? " video-thumb" : ""}`;
     if (image.isVideo) {
-      preview.innerHTML = `<div class="video-icon">▶</div><span class="video-label">${escapeHtml(image.name)}</span>`;
+      preview.innerHTML = `<div class="video-icon">PLAY</div><span class="video-label">${escapeHtml(image.name)}</span>`;
     } else {
       const img = document.createElement("img");
       img.src = image.path;
@@ -251,7 +403,7 @@ function renderPlaylist(device) {
     const delayClear = document.createElement("button");
     delayClear.type = "button";
     delayClear.className = "delay-clear";
-    delayClear.textContent = "×";
+    delayClear.textContent = "X";
     delayClear.title = "Use global delay";
     delayRow.append(delayLabel, delayInput, delayClear);
 
@@ -333,10 +485,141 @@ function renderPlaylist(device) {
   return wrap;
 }
 
+function renderPlaylistCards(device) {
+  if (!state.playlists.length) {
+    return `<div class="empty-list"><p>No reusable playlists yet.</p></div>`;
+  }
+  return state.playlists.map((playlist) => {
+    const isLive = playlist.id === device.activePlaylistId && !device.liveOverride;
+    const items = playlist.items || [];
+    return `
+      <article class="playlist-card ${isLive ? "is-live" : ""}" data-playlist="${escapeAttr(playlist.id)}">
+        <div class="playlist-card-head">
+          <div>
+            <strong>${escapeHtml(playlist.name)}</strong>
+            <span class="meta">${items.length} item${items.length === 1 ? "" : "s"}</span>
+          </div>
+          ${isLive ? `<span class="live-badge">Live</span>` : ""}
+        </div>
+        <div class="playlist-strip">
+          ${items.slice(0, 5).map(renderPlaylistThumb).join("") || `<span class="playlist-empty-thumb"></span>`}
+        </div>
+        <div class="playlist-card-actions">
+          <button type="button" class="make-live">Go Live</button>
+          <button type="button" class="danger delete-playlist">Delete</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderPlaylistThumb(item) {
+  if (item.isYouTube) return `<span class="playlist-thumb text-thumb">YT</span>`;
+  if (item.isVideo) return `<video class="playlist-thumb video-thumb-preview" src="${escapeAttr(item.path)}" muted playsinline preload="metadata"></video>`;
+  return `<img class="playlist-thumb" src="${escapeAttr(item.path)}" alt="">`;
+}
+
+function effectiveLiveItems(device) {
+  if (device.liveOverride) return [device.liveOverride];
+  if (device.activePlaylistId) {
+    const playlist = state.playlists.find((item) => item.id === device.activePlaylistId);
+    return playlist?.items || [];
+  }
+  return [];
+}
+
+function livePreviewLabel(device) {
+  if (device.liveOverride) return "Single-item override is live";
+  if (device.activePlaylistId) {
+    const playlist = state.playlists.find((item) => item.id === device.activePlaylistId);
+    return playlist ? `${playlist.name} playlist is live` : "Playlist is live";
+  }
+  return "No live content";
+}
+
+function renderLivePreviewItems(device) {
+  const items = effectiveLiveItems(device);
+  if (!items.length) return `<span class="playlist-empty-thumb"></span>`;
+  return items.slice(0, 12).map(renderPlaylistThumb).join("");
+}
+
+function renderLivePreviewHero(device) {
+  const [item] = effectiveLiveItems(device);
+  if (!item) {
+    return `<div class="empty-list"><p>No live content.</p></div>`;
+  }
+  if (item.isYouTube) {
+    return `<div class="asset-preview video-thumb live-hero"><div class="video-icon">PLAY</div><span class="video-label">${escapeHtml(item.name || "YouTube")}</span></div>`;
+  }
+  if (item.isVideo) {
+    return `<div class="asset-preview video-thumb live-hero"><div class="video-icon">VID</div><span class="video-label">${escapeHtml(item.name || "Video")}</span></div>`;
+  }
+  return `<div class="asset-preview live-hero"><img src="${escapeAttr(item.path)}" alt="${escapeAttr(item.name || "Live item")}"></div>`;
+}
+
+function renderLibraryCards() {
+  if (!state.library.length) {
+    return `<div class="empty-list"><p>No library items yet.</p></div>`;
+  }
+  return state.library.map((item) => `
+    <article class="playlist-card" data-library-item="${escapeAttr(item.id)}">
+      <div class="playlist-card-head">
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <span class="meta">${escapeHtml(String(item.type || "image").toUpperCase())}</span>
+        </div>
+      </div>
+      <div class="playlist-strip">
+        ${item.type === "youtube"
+          ? `<span class="playlist-thumb text-thumb">YT</span>`
+          : item.type === "video"
+          ? `<video class="playlist-thumb video-thumb-preview" src="${escapeAttr(item.path)}" muted playsinline preload="metadata"></video>`
+          : `<img class="playlist-thumb" src="${escapeAttr(item.path)}" alt="">`}
+      </div>
+      <div class="playlist-card-actions">
+        <button type="button" class="secondary add-library-to-playlist">Add</button>
+        <button type="button" class="secondary rename-library-item">Rename</button>
+        <button type="button" class="danger delete-library-item">Delete</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderPlaylistItemManagers() {
+  if (!state.playlists.length) {
+    return "";
+  }
+  return state.playlists.map((playlist) => {
+    const items = playlist.items || [];
+    return `
+      <article class="playlist-card" data-playlist-manage="${escapeAttr(playlist.id)}">
+        <div class="playlist-card-head">
+          <div>
+            <strong>${escapeHtml(playlist.name)} items</strong>
+            <span class="meta">${items.length} item${items.length === 1 ? "" : "s"}</span>
+          </div>
+        </div>
+        <div class="playlist-manage-list">
+          ${items.length ? items.map((item) => `
+            <div class="asset-info-row" data-playlist-item="${escapeAttr(item.id)}">
+              <div class="asset-name-col">
+                <strong>${escapeHtml(item.name || "Untitled item")}</strong>
+                <span class="meta">${item.isYouTube ? "YOUTUBE" : item.isVideo ? "VIDEO" : "IMAGE"}</span>
+              </div>
+              <div class="asset-actions">
+                <button type="button" class="danger delete-playlist-item">Remove</button>
+              </div>
+            </div>
+          `).join("") : `<div class="empty-list"><p>No items in this playlist.</p></div>`}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function bindWorkspace(device) {
   const sf = document.querySelector("#settingsForm");
-  const uf = document.querySelector("#uploadForm");
-  if (!sf || !uf) { console.error("forms missing:", { sf, uf, workspaceChildren: els.displayWorkspace.children.length }); return; }
+  if (!sf) { console.error("settings form missing:", { sf, workspaceChildren: els.displayWorkspace.children.length }); return; }
   // Restore pending values if user is mid-edit
   const savedLabel = pendingDeviceLabel || device.label || "";
   const savedLocation = pendingDeviceLocation || device.location || "";
@@ -373,24 +656,229 @@ function bindWorkspace(device) {
     });
   });
 
-  uf.addEventListener("submit", async (event) => {
+  document.querySelector("#deleteDisplayButton")?.addEventListener("click", async () => {
+    const ok = window.confirm(`Delete display "${device.label || device.id}"?\n\nThis action removes the display and its direct-uploaded files.`);
+    if (!ok) return;
+    await runAction("Deleting display", async () => {
+      await api(`/api/admin/devices/${encodeURIComponent(device.id)}`, { method: "DELETE" });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const createPlaylistForm = document.querySelector("#createPlaylistForm");
+  createPlaylistForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const files = Array.from(document.querySelector("#imageUpload").files || []);
-    if (!files.length) {
-      showToast("Choose one or more images.");
+    const name = document.querySelector("#newPlaylistName")?.value.trim();
+    if (!name) { showToast("Enter a playlist name."); return; }
+    await runAction("Creating playlist", async () => {
+      await api("/api/admin/playlists", { method: "POST", body: { name } });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const pushLiveType = document.querySelector("#pushLiveType");
+  const pushLivePlaylistWrap = document.querySelector("#pushLivePlaylistWrap");
+  const pushLiveLibraryWrap = document.querySelector("#pushLiveLibraryWrap");
+  const syncPushLiveMode = () => {
+    const mode = pushLiveType?.value || "playlist";
+    if (pushLivePlaylistWrap) pushLivePlaylistWrap.style.display = mode === "playlist" ? "" : "none";
+    if (pushLiveLibraryWrap) pushLiveLibraryWrap.style.display = mode === "library" ? "" : "none";
+  };
+  pushLiveType?.addEventListener("change", syncPushLiveMode);
+  syncPushLiveMode();
+
+  const pushLiveForm = document.querySelector("#pushLiveForm");
+  pushLiveForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const mode = pushLiveType?.value || "playlist";
+    if (mode === "playlist") {
+      const playlistId = document.querySelector("#pushLivePlaylistId")?.value;
+      if (!playlistId) { showToast("Choose a playlist to push live."); return; }
+      await runAction("Pushing playlist live", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/live`, {
+          method: "POST",
+          body: { playlistId }
+        });
+        await loadState({ keepStatus: true });
+      });
       return;
     }
-    await runAction(`Pushing ${files.length} image${files.length === 1 ? "" : "s"}`, async () => {
-      for (const file of files) {
-        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/images`, {
-          method: "POST",
-          body: {
-            name: file.name,
-            dataUrl: await readFileAsDataUrl(file)
-          }
-        });
-      }
+    const libraryItemId = document.querySelector("#pushLiveLibraryId")?.value;
+    if (!libraryItemId) { showToast("Choose a library item to push live."); return; }
+    await runAction("Pushing library item live", async () => {
+      await api(`/api/admin/devices/${encodeURIComponent(device.id)}/override-library`, {
+        method: "POST",
+        body: { libraryItemId }
+      });
       await loadState({ keepStatus: true });
+    });
+  });
+
+  const playlistUploadForm = document.querySelector("#playlistUploadForm");
+  playlistUploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const playlistId = document.querySelector("#playlistUploadTarget")?.value;
+    const file = document.querySelector("#playlistUploadFile")?.files?.[0];
+    if (!playlistId) { showToast("Create a playlist first."); return; }
+    if (!file) { showToast("Choose a file to add."); return; }
+    await runAction("Adding content to playlist", async () => {
+      await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items`, {
+        method: "POST",
+        body: { name: file.name, dataUrl: await readFileAsDataUrl(file) }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const copySourceSelect = document.querySelector("#playlistCopySource");
+  const copyItemSelect = document.querySelector("#playlistCopyItem");
+  const copyTargetSelect = document.querySelector("#playlistCopyTarget");
+  const refreshCopyItems = () => {
+    if (!copySourceSelect || !copyItemSelect) return;
+    const items = state.playlists.find((playlist) => playlist.id === copySourceSelect.value)?.items || [];
+    copyItemSelect.innerHTML = items.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name || "Untitled item")}</option>`).join("");
+    copyItemSelect.disabled = !items.length;
+  };
+  copySourceSelect?.addEventListener("change", refreshCopyItems);
+  refreshCopyItems();
+
+  const playlistCopyForm = document.querySelector("#playlistCopyForm");
+  playlistCopyForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const sourcePlaylistId = copySourceSelect?.value;
+    const sourceItemId = copyItemSelect?.value;
+    const targetPlaylistId = copyTargetSelect?.value;
+    if (!sourcePlaylistId || !targetPlaylistId) { showToast("Choose source and target playlists."); return; }
+    if (!sourceItemId) { showToast("Choose an item to copy."); return; }
+    if (sourcePlaylistId === targetPlaylistId) { showToast("Source and target playlists cannot be the same."); return; }
+    await runAction("Copying item to playlist", async () => {
+      await api(`/api/admin/playlists/${encodeURIComponent(targetPlaylistId)}/items/copy`, {
+        method: "POST",
+        body: { sourcePlaylistId, sourceItemId }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  document.querySelector("#clearOverrideButton")?.addEventListener("click", async () => {
+    await runAction("Clearing override", async () => {
+      await api(`/api/admin/devices/${encodeURIComponent(device.id)}/override`, { method: "DELETE" });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  document.querySelectorAll(".playlist-card").forEach((card) => {
+    const playlistId = card.dataset.playlist;
+    card.querySelector(".make-live")?.addEventListener("click", async () => {
+      await runAction("Changing live playlist", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/live`, {
+          method: "POST",
+          body: { playlistId }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
+    card.querySelector(".delete-playlist")?.addEventListener("click", async () => {
+      await runAction("Deleting playlist", async () => {
+        await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}`, { method: "DELETE" });
+        await loadState({ keepStatus: true });
+      });
+    });
+  });
+
+  const libraryUploadForm = document.querySelector("#libraryUploadForm");
+  libraryUploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const file = document.querySelector("#libraryUploadFile")?.files?.[0];
+    if (!file) { showToast("Choose a library file."); return; }
+    await runAction("Uploading to library", async () => {
+      await api("/api/admin/library", {
+        method: "POST",
+        body: { name: file.name, dataUrl: await readFileAsDataUrl(file) }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const libraryToPlaylistForm = document.querySelector("#libraryToPlaylistForm");
+  libraryToPlaylistForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const libraryItemId = document.querySelector("#libraryItemSelect")?.value;
+    const playlistId = document.querySelector("#libraryTargetPlaylist")?.value;
+    if (!libraryItemId || !playlistId) { showToast("Choose a library item and playlist."); return; }
+    await runAction("Adding library item to playlist", async () => {
+      await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/from-library`, {
+        method: "POST",
+        body: { libraryItemId }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const libraryYoutubeForm = document.querySelector("#libraryYoutubeForm");
+  libraryYoutubeForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const youtubeUrl = document.querySelector("#libraryYoutubeUrl")?.value?.trim();
+    const name = document.querySelector("#libraryYoutubeName")?.value?.trim();
+    if (!youtubeUrl) { showToast("Enter a YouTube URL."); return; }
+    await runAction("Adding YouTube URL to library", async () => {
+      await api("/api/admin/library/youtube", {
+        method: "POST",
+        body: { youtubeUrl, name }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  document.querySelectorAll("[data-library-item]").forEach((card) => {
+    const libraryItemId = card.dataset.libraryItem;
+    card.querySelector(".rename-library-item")?.addEventListener("click", async () => {
+      const currentName = card.querySelector(".playlist-card-head strong")?.textContent?.trim() || "";
+      const name = window.prompt("Rename library item:", currentName);
+      if (name === null) return;
+      const trimmed = name.trim();
+      if (!trimmed) { showToast("Name cannot be empty."); return; }
+      await runAction("Renaming library item", async () => {
+        await api(`/api/admin/library/${encodeURIComponent(libraryItemId)}`, {
+          method: "PATCH",
+          body: { name: trimmed }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
+    card.querySelector(".add-library-to-playlist")?.addEventListener("click", async () => {
+      const playlistId = document.querySelector("#libraryTargetPlaylist")?.value;
+      if (!playlistId) { showToast("Choose a target playlist first."); return; }
+      await runAction("Adding library item to playlist", async () => {
+        await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/from-library`, {
+          method: "POST",
+          body: { libraryItemId }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
+    card.querySelector(".delete-library-item")?.addEventListener("click", async () => {
+      await runAction("Deleting library item", async () => {
+        await api(`/api/admin/library/${encodeURIComponent(libraryItemId)}`, { method: "DELETE" });
+        await loadState({ keepStatus: true });
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-playlist-manage]").forEach((card) => {
+    const playlistId = card.dataset.playlistManage;
+    card.querySelectorAll(".delete-playlist-item").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const row = button.closest("[data-playlist-item]");
+        const itemId = row?.dataset.playlistItem;
+        if (!itemId) return;
+        await runAction("Removing playlist item", async () => {
+          await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/${encodeURIComponent(itemId)}`, {
+            method: "DELETE"
+          });
+          await loadState({ keepStatus: true });
+        });
+      });
     });
   });
 
@@ -471,6 +959,13 @@ async function api(path, options = {}) {
 
 function selectedDevice() {
   return state.devices.find((device) => device.id === selectedDeviceId) || null;
+}
+
+function liveLabel(device) {
+  if (device.liveOverride) return "Override live";
+  const playlist = state.playlists.find((item) => item.id === device.activePlaylistId);
+  if (playlist) return `${playlist.name} live`;
+  return "No live playlist";
 }
 
 function displayStatus(lastSeenAt) {

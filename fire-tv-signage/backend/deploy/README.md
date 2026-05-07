@@ -54,6 +54,20 @@ npm run signage -- upload DEVICE_ID /path/to/image-1.jpg /path/to/image-2.png
 npm run signage -- show DEVICE_ID
 npm run signage -- remove-image DEVICE_ID IMAGE_ID
 npm run signage -- clear DEVICE_ID
+npm run signage -- playlists list
+npm run signage -- playlists create "Morning Playlist"
+npm run signage -- playlist-item-add PLAYLIST_ID /path/to/slide.png
+npm run signage -- library add /path/to/asset.png --tag menu
+npm run signage -- playlist-item-add-library PLAYLIST_ID LIBRARY_ITEM_ID
+npm run signage -- live DEVICE_ID --playlist PLAYLIST_ID
+npm run signage -- override DEVICE_ID /path/to/urgent.png
+npm run signage -- override-clear DEVICE_ID
+```
+
+For full command coverage, run:
+
+```sh
+npm run signage -- help
 ```
 
 If you deploy with Docker Compose, run the CLI inside the container:
@@ -61,6 +75,7 @@ If you deploy with Docker Compose, run the CLI inside the container:
 ```sh
 docker compose exec signage-backend node cli.mjs devices
 docker compose exec signage-backend node cli.mjs upload DEVICE_ID /data/uploads/local-file.png
+docker compose exec signage-backend node cli.mjs playlists list
 ```
 
 If the backend is not on `http://127.0.0.1:3002`, pass `--url` or set `SIGNAGE_URL`:
@@ -75,6 +90,16 @@ To install a short `signage` command:
 sudo ln -sf /opt/fire-tv-signage/backend/cli.mjs /usr/local/bin/signage
 signage devices
 ```
+
+## OpenClaw Agent Skill
+
+The repository includes an OpenClaw-optimized skill file at:
+
+```text
+SKILL.md
+```
+
+Use it as the operational guide for deploy, verification, and CLI/API workflows.
 
 ## APK Build URL
 
