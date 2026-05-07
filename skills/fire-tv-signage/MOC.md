@@ -31,6 +31,9 @@ Download YouTube video (720p max), restructure moov atom, push to device.
 ### `signage push <deviceId> --from-url "URL"`
 Fetch remote image/video, push to device.
 
+### `signage push <deviceId> --from-web "URL" --name "Label"`
+Push a live WebView URL to Fire TV. The receiver renders the page directly. URL is also saved to the library for reuse.
+
 ### `signage push <deviceId> --from-library "tag or id"`
 Push a saved library item to a device playlist.
 
@@ -42,6 +45,8 @@ Save images/videos once, tag them, reuse across devices and time.
 
 ```bash
 signage library add /path/to/file.jpg --tag family
+signage library add-web "https://example.com/dashboard" --name "Dashboard" --tag dashboard
+signage library add-youtube "https://youtube.com/watch?v=..." --name "Video" --tag promo
 signage library list
 signage library search vacation
 signage push <deviceId> --from-library "family-vacation"
@@ -176,7 +181,7 @@ Fire TV Receiver App ◄── polls every 5s ───► /uploads/ (local file
 Display (images FIT_CENTER, videos VideoView)
 ```
 
-**Known working:** Living Room TV (`60912977-a2d4-400b-b041-2f0612667051`)
+**Known working:** Living Room TV (`8e8032d5-b1b6-4733-8ea5-dc56633f36b2`)
 
 **Backend:** `http://192.168.2.90:3002`
 **Fire TV:** `192.168.2.250:5555` (ADB)

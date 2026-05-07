@@ -35,6 +35,12 @@ signage push DEVICE_ID /path/to/video.mp4
 signage push DEVICE_ID --from-library "franklin-summer"
 ```
 
+## Push a Live Web Page (WebView)
+```bash
+signage push DEVICE_ID --from-web "https://example.com/dashboard" --name "Dashboard"
+```
+Pushes a URL directly to the Fire TV receiver, which renders it in WebView. The page is also saved to the library so it can be pushed again via `--from-library`.
+
 ## Push YouTube Video
 ```bash
 signage push DEVICE_ID --from-youtube "https://youtube.com/watch?v=..."

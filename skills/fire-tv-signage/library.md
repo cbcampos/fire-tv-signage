@@ -24,6 +24,12 @@ signage library add /path/to/video.mp4 --tag "promo-video"
 
 # Tag multiple
 signage library add /path/to/schedule.png --tag "schedule" --tag "franklin" --tag "2026"
+
+# Save a WebView URL (rendered live on Fire TV via WebView)
+signage library add-web "https://example.com/dashboard" --name "Ops Dashboard" --tag "dashboard"
+
+# Save a YouTube URL (for on-demand streaming, not downloaded)
+signage library add-youtube "https://youtube.com/watch?v=..." --name "Promo Video"
 ```
 
 ## List Library
@@ -50,6 +56,12 @@ signage push --all --from-library "announcement"
 ## Remove from Library
 ```bash
 signage library remove LIBRARY_ID
+```
+
+## Push Library Web URL to Device
+```bash
+# Push any saved web/library URL to a device as a live override
+signage push DEVICE_ID --from-library "dashboard"
 ```
 
 ## Library Metadata (db.json)
