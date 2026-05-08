@@ -133,10 +133,15 @@ sessions_spawn(
 - Contains ChatGPT OAuth token for `chris.campos@gmail.com`
 - If Codex sub-agent fails with "Authentication required", check that this file exists and has valid tokens
 
+**Tool access:**
+- `codexDynamicToolsProfile: "openclaw-compat"` — exposes full OpenClaw toolkit to Codex sub-agents (messaging, cron, web_search, browser, memory, etc.)
+- Codex native tools (read, write, edit, exec) still available alongside OpenClaw tools
+
 **When to use:**
 - Coding tasks that benefit from GPT-5.5's capabilities
 - File operations, refactors, builds, debugging
 - Tasks where MiniMax hits limitations
+- Tasks that need web search, messaging, or browser automation alongside coding
 
 **When NOT to use:**
 - General conversation, admin tasks, reminders (keep on MiniMax)
@@ -151,4 +156,22 @@ sessions_spawn(
 }
 ```
 
-**Tested and working** (2026-05-08): File write + readback confirmed. Task status: `succeeded`.
+**Plugin config (codex with openclaw-compat tools):**
+```json
+{
+  "plugins": {
+    "entries": {
+      "codex": {
+        "enabled": true,
+        "config": {
+          "codexDynamicToolsProfile": "openclaw-compat"
+        }
+      }
+    }
+  }
+}
+```
+
+**Tested and working** (2026-05-08):
+- File write + readback ✅
+- OpenClaw tools (read, web_search, multi_tool_use.parallel) confirmed accessible to Codex sub-agent ✅
