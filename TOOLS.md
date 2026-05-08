@@ -94,10 +94,21 @@ When Amanda Claire needs content for the week, use this framework:
 signage devices
 
 # Push a web URL to a specific device
-signage push <deviceId> --from-web "http://192.168.2.90:8888/command-center.html" --name "Title"
+```bash
+# Push to Google TV (always use --from-web — it auto-deduplicates by name)
+signage push 32d814c9-1917-4cea-9041-3624c9c9fcd1 --from-web "http://192.168.2.90:8888/command-center.html" --name "Family Command Center"
 
-# Push to all online devices
-signage push --all /path/to/file
+# Push to Fire TV (use --from-library to reuse the saved entry)
+signage push 8e8032d5-b1b6-4733-8ea5-dc56633f36b2 --from-library "Family Command Center"
+```
+
+**How it works:** `--from-web` checks if a library item with that name exists and deletes it before creating, so you always get a fresh entry — no duplicates.
+
+**Check library:**
+```bash
+signage library list
+signage library search "Family Command Center"
+```
 
 # Health check
 signage health

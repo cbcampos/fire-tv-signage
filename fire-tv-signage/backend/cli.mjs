@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const DEFAULT_BASE_URL = process.env.SIGNAGE_URL || "http://127.0.0.1:3002";
+const DEFAULT_WYZE_BRIDGE_URL = process.env.WYZE_BRIDGE_URL || "http://192.168.2.90:1984";
 const DEFAULT_DATA_DIR = path.join(process.env.HOME || "", ".openclaw", "workspace", "fire-tv-signage", "backend", "data");
 const LIBRARY_DIR = path.join(process.env.SIGNAGE_DATA_DIR || DEFAULT_DATA_DIR, "library");
 
@@ -97,8 +98,14 @@ async function main() {
     case "override-library":
       await pushLibraryOverride(client, rest);
       return;
+    case "override-library-temp":
+      await pushLibraryOverrideTemporary(client, rest);
+      return;
     case "live-item":
       await pushLiveItem(client, rest);
+      return;
+    case "refresh-live":
+      await refreshLiveOutput(client, rest);
       return;
     case "override-clear":
       await clearOverride(client, rest);
@@ -108,6 +115,9 @@ async function main() {
       return;
     case "weather":
       await weatherCard(client, rest);
+      return;
+    case "wyze-cams":
+      await wyzeCams(rest);
       return;
     default:
       throw new Error(`Unknown command "${command}". Run "signage help".`);
@@ -146,8 +156,8 @@ async function push(client, rest, global) {
   if (!deviceId) throw new Error("push requires a device id (or --device DEVICE_ID)");
   const files = pos.slice(1).filter((a) => !a.startsWith("--"));
 
-  if (parsed.options.fromLibrary) {
-    const item = await findLibraryItem(client, parsed.options.fromLibrary);
+  if (parsed.options.fromLibrary || parsed.options['from-library']) {
+    const item = await findLibraryItem(client, parsed.options.fromLibrary || parsed.options['from-library']);
     await addLibraryItemToDevice(client, deviceId, item, global.url);
     console.log(`✓ Added "${item.name}" from library to playlist.`);
     return;
@@ -160,23 +170,34 @@ async function push(client, rest, global) {
     return;
   }
 
-  if (parsed.options.fromUrl) {
-    const file = await downloadUrl(parsed.options.fromUrl);
-    await uploadFile(client, deviceId, file, { saveLibrary: parsed.options.saveLibrary });
-    console.log(`✓ URL content pushed to playlist.`);
-    return;
-  }
-
   if (parsed.options["from-web"] || parsed.options.fromWeb) {
     const webUrl = String(parsed.options["from-web"] || parsed.options.fromWeb).trim();
     if (!webUrl) throw new Error("push --from-web requires a URL");
     const webName = parsed.options.name || parsed.options.webName || parsed.options["web-name"] || "Web Dashboard";
     const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
-    const result = await client.post("/api/admin/library/web", { webUrl, name: webName, tags });
-    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
-      libraryItemId: result.item.id
-    });
+    await pushWebOverride(client, deviceId, { webUrl, name: webName, tags });
     console.log(`✓ Web URL pushed live to ${deviceId}.`);
+    return;
+  }
+
+  if (parsed.options["from-wyze"] || parsed.options.fromWyze) {
+    const cameraName = String(parsed.options["from-wyze"] || parsed.options.fromWyze).trim();
+    if (!cameraName) throw new Error("push --from-wyze requires a camera name like baby_cam");
+    const bridgeUrl = String(
+      parsed.options["wyze-bridge"] || parsed.options.wyzeBridge || DEFAULT_WYZE_BRIDGE_URL
+    ).replace(/\/$/, "");
+    const mode = String(parsed.options["wyze-mode"] || parsed.options.wyzeMode || "hls,mse,webrtc");
+    const webUrl = `${bridgeUrl}/stream.html?src=${encodeURIComponent(cameraName)}&mode=${encodeURIComponent(mode)}`;
+    const name = parsed.options.name || `Wyze: ${cameraName}`;
+    await pushWebOverride(client, deviceId, { webUrl, name, tags: ["wyze-camera"] });
+    console.log(`✓ Wyze camera "${cameraName}" pushed live to ${deviceId}.`);
+    return;
+  }
+
+  if (parsed.options.fromUrl) {
+    const file = await downloadUrl(parsed.options.fromUrl);
+    await uploadFile(client, deviceId, file, { saveLibrary: parsed.options.saveLibrary });
+    console.log(`✓ URL content pushed to playlist.`);
     return;
   }
 
@@ -213,6 +234,65 @@ async function library(client, rest) {
     const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
     const item = await uploadFile(client, null, file, { libraryOnly: true, tags });
     console.log(`✓ Saved to library: ${item.id}`);
+    return;
+  }
+  if (action === "add-youtube") {
+    const youtubeUrl = parsed.positionals[0] || parsed.options.url;
+    if (!youtubeUrl) throw new Error("library add-youtube <youtubeUrl> [--name NAME]");
+    const name = parsed.options.name || parsed.positionals.slice(1).join(" ");
+    const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
+    const result = await client.post("/api/admin/library/youtube", { youtubeUrl, name, tags });
+    console.log(`✓ Saved YouTube URL to library: ${result.item.id}`);
+    return;
+  }
+  if (action === "add-web") {
+    const webUrl = parsed.positionals[0] || parsed.options.url;
+    if (!webUrl) throw new Error("library add-web <webUrl> [--name NAME]");
+    const name = parsed.options.name || parsed.positionals.slice(1).join(" ");
+    const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
+    const result = await client.post("/api/admin/library/web", { webUrl, name, tags });
+    console.log(`✓ Saved web URL to library: ${result.item.id}`);
+    return;
+  }
+  if (action === "add-wyze") {
+    const cameraName = parsed.positionals[0] || parsed.options.camera;
+    if (!cameraName) throw new Error("library add-wyze <cameraName> [--name NAME] [--wyze-bridge URL] [--wyze-mode MODES]");
+    const name = parsed.options.name || parsed.positionals.slice(1).join(" ");
+    const bridgeUrl = parsed.options["wyze-bridge"] || parsed.options.wyzeBridge || DEFAULT_WYZE_BRIDGE_URL;
+    const mode = parsed.options["wyze-mode"] || parsed.options.wyzeMode || "mse,webrtc,hls";
+    const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
+    const result = await client.post("/api/admin/library/wyze", {
+      cameraName: String(cameraName).trim(),
+      name,
+      bridgeUrl,
+      mode,
+      tags
+    });
+    console.log(`✓ Saved Wyze camera to library: ${result.item.id}`);
+    return;
+  }
+  if (action === "add-multicam") {
+    const cameraArg = parsed.options.cameras || parsed.positionals[0];
+    const cameraNames = parseCameraNames(cameraArg);
+    if (!cameraNames.length) {
+      throw new Error("library add-multicam --cameras cam1,cam2[,cam3] [--name NAME] [--title TITLE] [--cols 2|3|4]");
+    }
+    const name = parsed.options.name || "";
+    const title = parsed.options.title || "";
+    const cols = Number(parsed.options.cols || 2);
+    const bridgeUrl = parsed.options["wyze-bridge"] || parsed.options.wyzeBridge || DEFAULT_WYZE_BRIDGE_URL;
+    const mode = parsed.options["wyze-mode"] || parsed.options.wyzeMode || "hls,mse,webrtc";
+    const tags = parsed.options.tag ? [parsed.options.tag].flat() : [];
+    const result = await client.post("/api/admin/library/multicam", {
+      cameraNames,
+      name,
+      title,
+      cols,
+      bridgeUrl,
+      mode,
+      tags
+    });
+    console.log(`✓ Saved multi-cam layout to library: ${result.item.id}`);
     return;
   }
   if (action === "remove") {
@@ -339,6 +419,30 @@ async function youtubePush(client, rest, global) {
   console.log(`✓ YouTube video pushed to ${deviceId}.`);
 }
 
+async function wyzeCams(rest) {
+  const parsed = parseOptions(rest);
+  const bridgeUrl = String(parsed.options["bridge-url"] || parsed.options.bridgeUrl || "http://192.168.2.90:5080").replace(/\/$/, "");
+  let response = await fetch(`${bridgeUrl}/api/cameras`);
+  if (response.status === 404 && bridgeUrl.endsWith(":1984")) {
+    const fallback = bridgeUrl.replace(":1984", ":5080");
+    response = await fetch(`${fallback}/api/cameras`);
+  }
+  if (!response.ok) throw new Error(`Failed to query Wyze cameras: ${response.status}`);
+  const cameras = await response.json();
+  if (!Array.isArray(cameras) || !cameras.length) {
+    console.log("No Wyze cameras found.");
+    return;
+  }
+  printRows(["name", "nickname", "model", "state", "ip"],
+    cameras.map((cam) => ({
+      name: cam.name || "",
+      nickname: cam.nickname || "",
+      model: cam.model_name || cam.model || "",
+      state: cam.state || "",
+      ip: cam.ip || ""
+    })));
+}
+
 // ─── Reorder ──────────────────────────────────────────────────────────────────
 
 async function reorder(client, rest) {
@@ -410,8 +514,8 @@ async function clearPlaylist(client, rest, global) {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 async function resolveSource(client, files, options, baseUrl) {
-  if (options.fromLibrary) {
-    return { kind: "library", item: await findLibraryItem(client, options.fromLibrary) };
+  if (options.fromLibrary || options['from-library']) {
+    return { kind: "library", item: await findLibraryItem(client, options.fromLibrary || options['from-library']) };
   }
   return null;
 }
@@ -419,7 +523,7 @@ async function resolveSource(client, files, options, baseUrl) {
 async function findLibraryItem(client, query) {
   const state = await client.state();
   const lib = state.library || [];
-  const exact = lib.find((item) => item.id === query || item.tags?.includes(query));
+  const exact = lib.find((item) => item.id === query || item.tags?.includes(query) || item.name === query);
   if (!exact) throw new Error(`Library item not found: ${query}`);
   return exact;
 }
@@ -441,6 +545,18 @@ async function addToDevice(client, deviceId, item) {
 }
 
 async function addLibraryItemToDevice(client, deviceId, libraryItem, baseUrl) {
+  if (libraryItem.type === "web" && libraryItem.webUrl) {
+    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+      libraryItemId: libraryItem.id
+    });
+    return;
+  }
+  if (libraryItem.type === "youtube" && libraryItem.youtubeUrl) {
+    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+      libraryItemId: libraryItem.id
+    });
+    return;
+  }
   const sourceUrl = libraryItem.path.startsWith("http")
     ? libraryItem.path
     : `${baseUrl.replace(/\/$/, "")}${libraryItem.path}`;
@@ -452,6 +568,25 @@ async function addLibraryItemToDevice(client, deviceId, libraryItem, baseUrl) {
   await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/images`, {
     name: libraryItem.name,
     dataUrl
+  });
+}
+
+async function pushWebOverride(client, deviceId, { webUrl, name, tags = [] }) {
+  // Delete existing library item with the same name to avoid duplicates
+  try {
+    const existing = await findLibraryItem(client, name);
+    await client.delete(`/api/admin/library/${encodeURIComponent(existing.id)}`);
+    console.log(`  (removed duplicate library item: ${existing.id})`);
+  } catch (_) {
+    // No existing item — nothing to remove
+  }
+  const result = await client.post("/api/admin/library/web", {
+    webUrl,
+    name,
+    tags
+  });
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+    libraryItemId: result.item.id
   });
 }
 
@@ -608,14 +743,37 @@ async function pushLibraryOverride(client, rest) {
   console.log("✓ Library item pushed live as override.");
 }
 
+async function pushLibraryOverrideTemporary(client, rest) {
+  const parsed = parseOptions(rest);
+  const deviceId = required(parsed.positionals[0], "override-library-temp <deviceId> <libraryItemId> [--for SECONDS]");
+  const libraryItemId = required(parsed.positionals[1] || parsed.options.item, "override-library-temp requires <libraryItemId> or --item");
+  const durationSeconds = clamp(Number(parsed.options.for || parsed.options.seconds || 30), 2, 3600);
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library-temporary`, {
+    libraryItemId,
+    durationSeconds
+  });
+  console.log(`✓ Library item announced for ${durationSeconds}s.`);
+}
+
 async function pushLiveItem(client, rest) {
   const parsed = parseOptions(rest);
   const deviceId = required(parsed.positionals[0], "live-item <deviceId> (--library LIB_ID | --playlist PLAYLIST_ID --item ITEM_ID)");
+  const durationSeconds = parsed.options.for || parsed.options.seconds
+    ? clamp(Number(parsed.options.for || parsed.options.seconds), 2, 3600)
+    : null;
   if (parsed.options.library) {
-    await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
-      libraryItemId: parsed.options.library
-    });
-    console.log("✓ Library item pushed live.");
+    if (durationSeconds) {
+      await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library-temporary`, {
+        libraryItemId: parsed.options.library,
+        durationSeconds
+      });
+      console.log(`✓ Library item announced for ${durationSeconds}s.`);
+    } else {
+      await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/override-library`, {
+        libraryItemId: parsed.options.library
+      });
+      console.log("✓ Library item pushed live.");
+    }
     return;
   }
   if (parsed.options.playlist && parsed.options.item) {
@@ -633,6 +791,12 @@ async function clearOverride(client, rest) {
   const deviceId = required(rest[0], "override-clear <deviceId>");
   await client.delete(`/api/admin/devices/${encodeURIComponent(deviceId)}/override`);
   console.log("✓ Override cleared.");
+}
+
+async function refreshLiveOutput(client, rest) {
+  const deviceId = required(rest[0], "refresh-live <deviceId>");
+  await client.post(`/api/admin/devices/${encodeURIComponent(deviceId)}/refresh-live`, {});
+  console.log("✓ Live output refresh requested.");
 }
 
 async function uploadFile(client, deviceId, file, opts = {}) {
@@ -710,6 +874,13 @@ function runFFmpeg(input, args) {
 }
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function parseCameraNames(value) {
+  return String(value || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
 
 // ─── Original CLI commands (unchanged) ───────────────────────────────────────
 
@@ -875,9 +1046,11 @@ Commands:
   push <deviceId> <file>          Push image/video to display
   push --all <file>                Push to all paired devices
   push <deviceId> --from-library "tag"   Push from library
-  push <deviceId> --from-web "url" [--name N]  Push live WebView URL
+  push <deviceId> --from-web "url" [--name N]  Save + push web URL live
+  push <deviceId> --from-wyze "camera_name" [--wyze-bridge URL] [--wyze-mode MODES] [--name N]
   push <deviceId> --from-url "url"       Push from URL
   push <deviceId> --from-youtube "url"   Download + push YouTube
+  wyze-cams [--bridge-url URL]           List cameras from working Wyze bridge
 
   clear <deviceId>                 Clear playlist
   remove-image <deviceId> <imgId>  Remove one item
@@ -890,6 +1063,11 @@ Commands:
 
   library list                     Show library
   library add <file> --tag NAME    Add to library
+  library add-youtube <url> [--name NAME] [--tag TAG]  Save YouTube URL to library
+  library add-web <url> [--name NAME] [--tag TAG]      Save web URL to library
+  library add-wyze <cameraName> [--name NAME] [--wyze-bridge URL] [--wyze-mode MODES] [--tag TAG]
+  library add-multicam --cameras cam1,cam2 [--name NAME] [--title TITLE] [--cols 2|3|4]
+                       [--wyze-bridge URL] [--wyze-mode MODES] [--tag TAG]
   library remove <id>              Remove from library
   library search <query>           Search library
 
@@ -906,8 +1084,10 @@ Commands:
   override <deviceId> <file>                         Push single-item live override
   override-existing <deviceId> --playlist ID --item ITEM_ID
   override-library <deviceId> <libraryItemId>       Push library item live as override
-  live-item <deviceId> --library LIB_ID             Push library item live
+  override-library-temp <deviceId> <libraryItemId> [--for SECONDS]  Temporary announcement override
+  live-item <deviceId> --library LIB_ID [--for SECONDS]             Push/announce library item live
   live-item <deviceId> --playlist P --item I        Push playlist item live
+  refresh-live <deviceId>                            Force reconnect of currently live source
   override-clear <deviceId>                          Clear live override
 
   youtube-push <url> <deviceId>    Download YouTube and push
