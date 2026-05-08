@@ -11,7 +11,8 @@ DISCORD_CHANNEL="1470900732931735697"
 # ── Bee: journals, todos, daily summary ─────────────────────────────────────
 BEE_JOURNALS=$(bee journals list 2>/dev/null || echo "")
 BEE_TODOS=$(bee todos list 2>/dev/null || echo "")
-BEE_DAILY=$(bee daily list --limit 1 2>/dev/null || echo "")
+BEE_DAILY_ID=$(bee daily list --limit 1 2>/dev/null | grep "### Daily Summary" | grep -oP '\d+' || echo "")
+BEE_DAILY=$(bee daily get "$BEE_DAILY_ID" 2>/dev/null || bee daily list --limit 1 2>/dev/null)
 BEE_NOW=$(bee now 2>/dev/null || echo "")
 
 # ── Calendar: all 3 calendars ────────────────────────────────────────────────

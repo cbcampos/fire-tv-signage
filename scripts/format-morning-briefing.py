@@ -126,6 +126,55 @@ def extract_daily_summary(text):
             summary_lines.append(line.rstrip())
     return "\n".join(summary_lines).strip() if summary_lines else None
 
+# ── Parse Bee journals — last 2 days, text only ─────────────────────────────
+def extract_bee_journals(text, days=2):
+    """Extract journal entries from the last `days` days (text only)."""
+    if not text or "### Journal" not in text:
+        return []
+    lines = text.split("\n")
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    entries = []
+    current_date = None
+    text_lines = []
+    in_header = False   # True: processing metadata (created_at, state, etc.)
+    in_body = False     # True: processing text content between --- and next ###
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("### Journal"):
+            # Save previous entry
+            if current_date and text_lines:
+                try:
+                    entry_dt = datetime.strptime(current_date, "%Y-%m-%d").replace(tzinfo=UTC)
+                    if entry_dt >= cutoff:
+                        entries.append({"date": current_date, "text": " ".join(text_lines).strip()})
+                except ValueError:
+                    pass
+            # Reset for new entry
+            current_date = None
+            text_lines = []
+            in_header = True
+            in_body = False
+        elif stripped.startswith("---"):
+            in_header = False
+            in_body = True
+        elif in_header and "created_at:" in stripped:
+            date_match = re.search(r"(\d{4}-\d{2}-\d{2})", stripped)
+            if date_match:
+                current_date = date_match.group(1)
+        elif stripped and not stripped.startswith("- "):
+            # Non-blank, non-metadata line = text content
+            if current_date is not None:
+                text_lines.append(stripped)
+    # Save last entry
+    if current_date and text_lines:
+        try:
+            entry_dt = datetime.strptime(current_date, "%Y-%m-%d").replace(tzinfo=UTC)
+            if entry_dt >= cutoff:
+                entries.append({"date": current_date, "text": " ".join(text_lines).strip()})
+        except ValueError:
+            pass
+    return entries
+
 # ── Parse Bee todos — last 2 days, open only ─────────────────────────────────
 def extract_bee_todos(text, days=2):
     """Extract Bee todos from the last `days` days."""
@@ -158,35 +207,21 @@ def extract_bee_todos(text, days=2):
                 todos.append({"text": todo_text})
     return todos[:8]
 
-# ── Parse Bee journal — today's most recent ──────────────────────────────────
-def extract_today_journal(text):
-    """Get today's most recent journal entry."""
-    if not text or "### Journal" not in text:
+# ── Short summary (2-3 sentences max) ─────────────────────────────────────
+def extract_short_summary(text):
+    """Extract the Short Summary from Bee daily summary."""
+    if not text:
         return None
-    today_str = datetime.now(UTC).strftime("%Y-%m-%d")
-    lines = text.split("\n")
-    entry_lines = []
-    capture = False
-    in_meta = False
-    entry_date = None
-    for line in lines:
-        if line.startswith("### Journal"):
-            if capture and entry_date == today_str:
-                break
-            capture = True
-            entry_lines = []
-            in_meta = True
-            entry_date = None
-        elif line.startswith("---"):
-            in_meta = False
-        elif in_meta and line.startswith("- created_at:"):
-            date_match = re.search(r"(\d{4}-\d{2}-\d{2})", line)
-            if date_match:
-                entry_date = date_match.group(1)
-        elif capture and not in_meta and line.strip() and not line.startswith("- "):
-            entry_lines.append(line.strip())
-    if entry_date == today_str and entry_lines:
-        return " ".join(entry_lines[:2]).strip()[:120]
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        # Check for Short Summary section
+        if '## Short Summary' in stripped or stripped.startswith('## Short Summary'):
+            # Next non-empty, non-EOF line is the actual summary
+            for j in range(i+1, len(lines)):
+                next_line = lines[j].strip()
+                if next_line and not next_line.startswith('#') and not next_line.startswith('---'):
+                    return next_line.strip()
     return None
 
 # ── Compute free blocks ──────────────────────────────────────────────────────
@@ -230,27 +265,24 @@ if weather_info:
     lines.append("")
 
 # Yesterday — full Bee summary, no truncation
-daily_summary = extract_daily_summary(BEE_DAILY)
-if daily_summary:
+short_summary = extract_short_summary(BEE_DAILY)
+if short_summary:
     lines.append("📖 YESTERDAY (Bee Summary)")
-    # Clean up blank lines but preserve paragraph breaks
-    paragraphs = [p.strip() for p in daily_summary.split("\n\n") if p.strip()]
-    for para in paragraphs:
-        lines.append(f"   {para}")
+    lines.append(f"   {short_summary}")
     lines.append("")
 
 # Bee todos + today's journal
+recent_journals = extract_bee_journals(BEE_JOURNALS, days=2)
 bee_todos_2day = extract_bee_todos(BEE_TODOS, days=2)
-today_journal  = extract_today_journal(BEE_JOURNALS)
 
-if bee_todos_2day or today_journal:
+if bee_todos_2day or recent_journals:
     lines.append("🗒️ BEE TASKS & NOTES (LAST 2 DAYS)")
-    if today_journal:
-        lines.append(f"   📌 {today_journal}")
+    for j in recent_journals:
+        lines.append(f"   📌 [{j['date']}] {j['text']}")
     if bee_todos_2day:
         for t in bee_todos_2day:
             lines.append(f"   ⏳ {t['text'][:70]}")
-    if not bee_todos_2day and not today_journal:
+    if not bee_todos_2day and not recent_journals:
         pass  # section not shown per Chris's request
     lines.append("")
 
