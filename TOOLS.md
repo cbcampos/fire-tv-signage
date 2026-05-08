@@ -108,3 +108,47 @@ bash ~/.openclaw/workspace/scripts/start-dashboards.sh
 **Devices:**
 - Living Room Google TV: `32d814c9-1917-4cea-9041-3624c9c9fcd1`
 - Living Room Fire TV: `8e8032d5-b1b6-4733-8ea5-dc56633f36b2`
+
+---
+
+## Codex Sub-Agent
+
+**Spawn a Codex coding sub-agent:**
+```python
+sessions_spawn(
+    agentId="codex",
+    mode="run",
+    task="<coding task description>"
+)
+```
+
+**How it works:**
+- `sessions_spawn(agentId: "codex")` routes to the codex agent with `agentRuntime.id: "codex"`
+- OpenClaw spawns the Codex app-server harness which injects the ChatGPT OAuth credentials from the codex agent's auth-profiles
+- Codex runs on `gpt-5.5` via OpenAI Responses API
+- Results auto-announce back to the main session
+
+**Auth setup (already done, don't repeat):**
+- Codex agent auth profile lives at: `~/.openclaw/agents/codex/agent/auth-profiles.json`
+- Contains ChatGPT OAuth token for `chris.campos@gmail.com`
+- If Codex sub-agent fails with "Authentication required", check that this file exists and has valid tokens
+
+**When to use:**
+- Coding tasks that benefit from GPT-5.5's capabilities
+- File operations, refactors, builds, debugging
+- Tasks where MiniMax hits limitations
+
+**When NOT to use:**
+- General conversation, admin tasks, reminders (keep on MiniMax)
+- Switching the main session model away from MiniMax
+
+**Codex agent config (openclaw.json):**
+```json
+{
+  "id": "codex",
+  "agentRuntime": { "id": "codex" },
+  "model": "openai/gpt-5.5"
+}
+```
+
+**Tested and working** (2026-05-08): File write + readback confirmed. Task status: `succeeded`.

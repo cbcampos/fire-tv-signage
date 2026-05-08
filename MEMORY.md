@@ -4,7 +4,7 @@
 - Host: `ccampos-Surface-Pro-6`
 - Timezone: `America/Chicago`
 - Primary agent: `main` (`Dobby`)
-- Other agents in active use: `forge`, `flaire`
+- Other agents in active use: `forge`, `flaire`, `codex`
 - Gateway config: `~/.openclaw/openclaw.json`
 - Gateway service: `openclaw-gateway.service`
 - Gateway restart command: `openclaw gateway restart`
@@ -12,9 +12,8 @@
 ### Model Policy
 - Default text model: `minimax-portal/MiniMax-M2.7`
 - Active-memory model: `minimax-portal/MiniMax-M2.7-highspeed`
-- Codex is fallback only: `openai-codex/gpt-5.4`
-- Do not intentionally switch the main or cron lanes to Codex unless MiniMax is failing.
-- Confirm on-host CLI help before making operational claims or repairs.
+- Codex is available as a first-class sub-agent via `sessions_spawn(agentId: "codex")`. Use it for coding tasks that benefit from GPT-5.5. Do NOT switch the main session model to Codex — keep MiniMax for all primary operations.
+- Cron jobs should run MiniMax-first.
 
 ### Gateway Rules
 - Use the smallest safe non-destructive repair first.
