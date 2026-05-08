@@ -83,31 +83,35 @@ When Amanda Claire needs content for the week, use this framework:
 
 ---
 
-## Local Dashboards (LAN, private)
+## Signage CLI (Fire TV / Google TV receivers)
 
-Dashboards served from `http://192.168.2.90:8888/` — not public.
+**CLI location:** `node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs`
 
-**Push to Fire TV:**
+**Always use this first** for anything related to signage receivers:
+
 ```bash
-signage push <deviceId> --from-web "http://192.168.2.90:8888/<file>.html" --name "Title"
+# Check all devices and their status
+signage devices
+
+# Push a web URL to a specific device
+signage push <deviceId> --from-web "http://192.168.2.90:8888/command-center.html" --name "Title"
+
+# Push to all online devices
+signage push --all /path/to/file
+
+# Health check
+signage health
 ```
 
-**Serve a new dashboard:**
-```bash
-cp /path/to/dashboard.html ~/.openclaw/workspace/dashboards/
-```
+**Known devices:**
+- `32d814c9-1917-4cea-9041-3624c9c9fcd1` — Living Room Google TV (Chromecast) — **online**
+- `8e8032d5-b1b6-4733-8ea5-dc56633f36b2` — Fire TV — **offline**
 
-**Start server:**
-```bash
-bash ~/.openclaw/workspace/scripts/start-dashboards.sh
-```
+**Important:** Fire TV goes offline when not in use. Push to Google TV (Chromecast) for the main display.
 
-**Available dashboards:**
-- `command-center.html` — Family Command Center (clock, weather, calendar, family panel)
+---
 
-**Devices:**
-- Living Room Google TV: `32d814c9-1917-4cea-9041-3624c9c9fcd1`
-- Living Room Fire TV: `8e8032d5-b1b6-4733-8ea5-dc56633f36b2`
+## Local Dashboards
 
 ---
 
