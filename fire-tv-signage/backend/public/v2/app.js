@@ -277,11 +277,16 @@ function renderLibraryCards() {
         <strong>${escapeHtml(item.name)}</strong>
         <p class="meta">${escapeHtml(String(item.type || 'image').toUpperCase())}</p>
       </div>
+      <label>Playlist target
+        <select data-library-target="${escapeAttr(item.id)}">
+          ${(state.playlists || []).map((playlist) => `<option value="${escapeAttr(playlist.id)}">${escapeHtml(playlist.name)}</option>`).join('')}
+        </select>
+      </label>
       <div class="card-actions">
         <button type="button" data-library-live="${escapeAttr(item.id)}">Push live</button>
         <button type="button" class="secondary" data-library-announce="${escapeAttr(item.id)}">Announce</button>
         <button type="button" class="secondary" data-library-announce-temp="${escapeAttr(item.id)}">30s live</button>
-        <button type="button" class="secondary" data-library-add="${escapeAttr(item.id)}">Add to playlist</button>
+        <button type="button" class="secondary" data-library-add="${escapeAttr(item.id)}" ${(state.playlists || []).length ? '' : 'disabled'}>Add to playlist</button>
         <button type="button" class="danger" data-library-delete="${escapeAttr(item.id)}">Delete</button>
       </div>
     </article>
@@ -482,8 +487,8 @@ function bindWorkspace(device) {
 
   document.querySelectorAll('[data-library-add]').forEach((button) => {
     button.addEventListener('click', async () => {
-      const playlistId = window.prompt('Paste target playlist ID from the playlist dropdown below:');
-      if (!playlistId) return;
+      const playlistId = document.querySelector(`[data-library-target="${button.dataset.libraryAdd}"]`)?.value;
+      if (!playlistId) return showToast('Create a playlist first.');
       await runAction('Adding item to playlist', async () => {
         await api(`/api/admin/playlists/${encodeURIComponent(playlistId)}/items/from-library`, { method: 'POST', body: { libraryItemId: button.dataset.libraryAdd } });
         await loadState({ keepStatus: true });
