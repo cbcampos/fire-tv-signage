@@ -15,17 +15,24 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.MediaController;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.VideoView;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -49,10 +56,20 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends Activity {
+    private static final String TAG = "SignageReceiver";
     private static class MediaItem {
         final String url;
         final boolean isVideo;
-        MediaItem(String url, boolean isVideo) { this.url = url; this.isVideo = isVideo; }
+        final boolean isWeb;
+        final boolean isYouTube;
+        final String youtubeUrl;
+        MediaItem(String url, boolean isVideo, boolean isWeb, boolean isYouTube, String youtubeUrl) {
+            this.url = url;
+            this.isVideo = isVideo;
+            this.isWeb = isWeb;
+            this.isYouTube = isYouTube;
+            this.youtubeUrl = youtubeUrl;
+        }
     }
     private static final String PREFS = "signage_receiver";
     private static final int PAIRING_POLL_MS = 3000;
@@ -64,9 +81,13 @@ public class MainActivity extends Activity {
 
     private SharedPreferences prefs;
     private ImageView imageView;
-    private VideoView videoView;
+    private WebView webView;
+    private PlayerView playerView;
+    private ExoPlayer exoPlayer;
+    private boolean loopCurrentVideo = false;
     private boolean videoPlaying = false;
     private int currentIndex = 0;
+    private String lastPlaylistSignature = "";
     private boolean activityActive = false;
     private TextView titleView;
     private TextView codeView;
@@ -123,6 +144,9 @@ public class MainActivity extends Activity {
             if (!activityActive) {
                 return;
             }
+            if (videoPlaying) {
+                return;
+            }
             showNextMedia();
             handler.postDelayed(this, Math.max(2000, slideDelayMs));
         }
@@ -177,6 +201,9 @@ public class MainActivity extends Activity {
         super.onPause();
         activityActive = false;
         handler.removeCallbacksAndMessages(null);
+        if (exoPlayer != null) {
+            exoPlayer.pause();
+        }
     }
 
     @Override
@@ -184,6 +211,10 @@ public class MainActivity extends Activity {
         super.onDestroy();
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
+        }
+        if (exoPlayer != null) {
+            exoPlayer.release();
+            exoPlayer = null;
         }
         io.shutdownNow();
     }
@@ -200,13 +231,28 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
-        videoView = new VideoView(this);
-        videoView.setBackgroundColor(Color.BLACK);
-        root.addView(videoView, new FrameLayout.LayoutParams(
+        playerView = new PlayerView(this);
+        playerView.setBackgroundColor(Color.BLACK);
+        playerView.setUseController(false);
+        root.addView(playerView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
-        videoView.setVisibility(View.GONE);
+        playerView.setVisibility(View.GONE);
+
+        webView = new WebView(this);
+        webView.setBackgroundColor(Color.BLACK);
+        WebSettings ws = webView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        webView.setWebViewClient(new WebViewClient());
+        root.addView(webView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        webView.setVisibility(View.GONE);
 
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -496,19 +542,38 @@ public class MainActivity extends Activity {
                 if (images != null) {
                     for (int i = 0; i < images.length(); i++) {
                         JSONObject image = images.getJSONObject(i);
-                        String imageUrl = image.optString("url", "");
-                        if (!imageUrl.isEmpty()) {
-                            String fullUrl = resolveUrl(imageUrl);
-                            boolean isVideo = isVideoUrl(fullUrl);
-                            next.add(new MediaItem(fullUrl, isVideo));
+                        String type = image.optString("type", "");
+                        String mediaUrl = image.optString("url", "");
+                        String youtubeUrl = image.optString("youtubeUrl", "");
+                        if ("youtube".equalsIgnoreCase(type) && !youtubeUrl.isEmpty()) {
+                            next.add(new MediaItem("", false, false, true, youtubeUrl));
+                        } else if ("web".equalsIgnoreCase(type)) {
+                            String targetUrl = !image.optString("webUrl", "").isEmpty() ? image.optString("webUrl", "") : mediaUrl;
+                            if (!targetUrl.isEmpty()) {
+                                next.add(new MediaItem(targetUrl, false, true, false, ""));
+                            }
+                        } else if (!mediaUrl.isEmpty()) {
+                            String fullUrl = resolveUrl(mediaUrl);
+                            boolean isVideo = "video".equalsIgnoreCase(type) || isVideoUrl(fullUrl);
+                            next.add(new MediaItem(fullUrl, isVideo, false, false, ""));
                         }
                     }
                 }
+                Log.i(TAG, "Playlist poll loaded items=" + next.size());
                 final int count = next.size();
                 runOnUiThread(() -> {
                     slideDelayMs = delaySeconds * 1000;
+                    String nextSignature = playlistSignature(next);
+                    boolean playlistChanged = !nextSignature.equals(lastPlaylistSignature);
+                    lastPlaylistSignature = nextSignature;
                     playlist.clear();
                     playlist.addAll(next);
+                    // If loop conditions changed while a video is in progress, apply immediately.
+                    if (exoPlayer != null && videoPlaying) {
+                        boolean shouldLoopNow = playlist.size() == 1 && playlist.get(0).isVideo;
+                        loopCurrentVideo = shouldLoopNow;
+                        exoPlayer.setRepeatMode(shouldLoopNow ? Player.REPEAT_MODE_ONE : Player.REPEAT_MODE_OFF);
+                    }
                     imageCount = count;
                     refreshStatusLabels();
                     if (playlist.isEmpty()) {
@@ -522,6 +587,11 @@ public class MainActivity extends Activity {
                         detailView.setText("");
                         statusView.setText("");
                         panel.setVisibility(View.GONE);
+                        if (playlistChanged) {
+                            // Live/playlist changes should interrupt current playback immediately.
+                            currentIndex = 0;
+                            interruptForPlaylistUpdate();
+                        }
                     }
                 });
             } catch (Exception e) {
@@ -530,14 +600,43 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void interruptForPlaylistUpdate() {
+        handler.removeCallbacks(slideAdvance);
+        videoPlaying = false;
+        loopCurrentVideo = false;
+        if (exoPlayer != null) {
+            exoPlayer.stop();
+            exoPlayer.clearMediaItems();
+        }
+        showNextMedia();
+        handler.postDelayed(slideAdvance, Math.max(2000, slideDelayMs));
+    }
+
+    private String playlistSignature(List<MediaItem> items) {
+        StringBuilder out = new StringBuilder();
+        for (MediaItem item : items) {
+            out.append(item.isYouTube ? "yt:" + item.youtubeUrl : item.url)
+                    .append("|")
+                    .append(item.isVideo ? "v" : "i")
+                    .append(";");
+        }
+        return out.toString();
+    }
+
     private void showNextMedia() {
         if (playlist.isEmpty()) {
             return;
         }
         MediaItem item = playlist.get(currentIndex % playlist.size());
         currentIndex = (currentIndex + 1) % playlist.size();
-        if (item.isVideo) {
-            playVideo(item.url);
+        Log.i(TAG, "showNextMedia isVideo=" + item.isVideo + " isWeb=" + item.isWeb + " isYouTube=" + item.isYouTube + " url=" + item.url + " youtubeUrl=" + item.youtubeUrl);
+        if (item.isYouTube) {
+            playYouTube(item.youtubeUrl, playlist.size() == 1);
+        } else if (item.isWeb) {
+            showWeb(item.url);
+        } else if (item.isVideo) {
+            boolean shouldLoop = playlist.size() == 1;
+            playVideo(item.url, shouldLoop);
         } else {
             showImage(item.url);
         }
@@ -550,9 +649,14 @@ public class MainActivity extends Activity {
     }
 
     private void showImage(String url) {
+        videoPlaying = false;
         imageView.setVisibility(View.VISIBLE);
-        videoView.setVisibility(View.GONE);
-        videoView.stopPlayback();
+        webView.setVisibility(View.GONE);
+        playerView.setVisibility(View.GONE);
+        if (exoPlayer != null) {
+            exoPlayer.stop();
+            exoPlayer.clearMediaItems();
+        }
         io.execute(() -> {
             try {
                 Bitmap bitmap = downloadBitmap(url);
@@ -563,23 +667,157 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void playVideo(String url) {
+    private void playVideo(String url, boolean shouldLoop) {
+        handler.removeCallbacks(slideAdvance);
         imageView.setVisibility(View.GONE);
-        videoView.setVisibility(View.VISIBLE);
+        webView.setVisibility(View.GONE);
+        playerView.setVisibility(View.VISIBLE);
         videoPlaying = true;
-        videoView.setVideoURI(Uri.parse(url));
-        videoView.setOnCompletionListener(mediaPlayer -> {
-            // Move to next after video finishes
-            handler.postDelayed(this::showNextMedia, 500);
+        loopCurrentVideo = shouldLoop;
+        setStatus("Preparing video...");
+        Log.i(TAG, "playVideo start url=" + url + " shouldLoop=" + shouldLoop);
+        io.execute(() -> {
+            try {
+                File localVideo = ensureVideoCached(url);
+                Log.i(TAG, "playVideo cached path=" + localVideo.getAbsolutePath() + " size=" + localVideo.length());
+                runOnUiThread(() -> startVideoPlayback(localVideo.getAbsolutePath()));
+            } catch (Exception e) {
+                Log.e(TAG, "playVideo failed", e);
+                setStatus("Video load failed: " + e.getMessage());
+                runOnUiThread(() -> {
+                    videoPlaying = false;
+                    handler.postDelayed(this::showNextMedia, 1000);
+                    handler.postDelayed(slideAdvance, Math.max(2000, slideDelayMs));
+                });
+            }
         });
-        videoView.setOnErrorListener((mp, what, extra) -> {
-            setStatus("Video error: " + what);
-            videoPlaying = false;
-            handler.postDelayed(this::showNextMedia, 1000);
-            return true;
+    }
+
+    private void playYouTube(String youtubeUrl, boolean shouldLoop) {
+        handler.removeCallbacks(slideAdvance);
+        imageView.setVisibility(View.GONE);
+        webView.setVisibility(View.GONE);
+        playerView.setVisibility(View.VISIBLE);
+        videoPlaying = true;
+        loopCurrentVideo = shouldLoop;
+        setStatus("Resolving YouTube stream...");
+        io.execute(() -> {
+            try {
+                String streamMetaUrl = serverUrl + "/api/admin/youtube/stream?url=" + enc(youtubeUrl);
+                JSONObject streamMeta = new JSONObject(httpGet(streamMetaUrl));
+                String streamUrl = streamMeta.optString("streamUrl", "");
+                if (streamUrl.isEmpty()) {
+                    throw new IllegalStateException("No playable stream URL returned.");
+                }
+                runOnUiThread(() -> startStreamPlayback(streamUrl));
+            } catch (Exception e) {
+                setStatus("YouTube load failed: " + e.getMessage());
+                runOnUiThread(() -> {
+                    videoPlaying = false;
+                    handler.postDelayed(this::showNextMedia, 1200);
+                    handler.postDelayed(slideAdvance, Math.max(2000, slideDelayMs));
+                });
+            }
         });
-        videoView.start();
+    }
+
+    private void showWeb(String url) {
+        Log.i(TAG, "showWeb url=" + url);
+        videoPlaying = false;
+        imageView.setVisibility(View.GONE);
+        playerView.setVisibility(View.GONE);
+        webView.setVisibility(View.VISIBLE);
+        if (exoPlayer != null) {
+            exoPlayer.stop();
+            exoPlayer.clearMediaItems();
+        }
+        webView.loadUrl(url);
+        setStatus("Showing web page...");
+    }
+
+    private void startVideoPlayback(String localPath) {
+        startStreamPlayback(Uri.fromFile(new File(localPath)).toString());
+    }
+
+    private void startStreamPlayback(String streamUri) {
+        if (exoPlayer == null) {
+            exoPlayer = new ExoPlayer.Builder(this).build();
+            exoPlayer.addListener(new Player.Listener() {
+                @Override
+                public void onPlaybackStateChanged(int playbackState) {
+                    if (playbackState == Player.STATE_ENDED) {
+                        if (loopCurrentVideo) {
+                            return;
+                        }
+                        videoPlaying = false;
+                        handler.post(MainActivity.this::showNextMedia);
+                        handler.postDelayed(slideAdvance, Math.max(2000, slideDelayMs));
+                    }
+                }
+
+                @Override
+                public void onPlayerError(PlaybackException error) {
+                    setStatus("Video error: " + error.getMessage());
+                    videoPlaying = false;
+                    handler.postDelayed(MainActivity.this::showNextMedia, 1000);
+                    handler.postDelayed(slideAdvance, Math.max(2000, slideDelayMs));
+                }
+            });
+            playerView.setPlayer(exoPlayer);
+        }
+        exoPlayer.setRepeatMode(loopCurrentVideo ? Player.REPEAT_MODE_ONE : Player.REPEAT_MODE_OFF);
+        exoPlayer.setMediaItem(androidx.media3.common.MediaItem.fromUri(Uri.parse(streamUri)));
+        exoPlayer.prepare();
+        exoPlayer.play();
         setStatus("Playing video...");
+    }
+
+    private File ensureVideoCached(String url) throws Exception {
+        String ext = videoExtension(url);
+        File cached = new File(cacheDir, cacheKey(url) + ext);
+        if (cached.exists() && cached.length() > 0) {
+            Log.i(TAG, "ensureVideoCached hit cache key=" + cached.getName());
+            return cached;
+        }
+        Log.i(TAG, "ensureVideoCached downloading url=" + url);
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(30000);
+        conn.setUseCaches(true);
+        InputStream input = null;
+        FileOutputStream output = null;
+        try {
+            input = new BufferedInputStream(conn.getInputStream());
+            output = new FileOutputStream(cached);
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+            }
+            output.flush();
+            return cached;
+        } catch (Exception e) {
+            if (cached.exists()) {
+                // Remove partial files so future attempts can retry cleanly.
+                //noinspection ResultOfMethodCallIgnored
+                cached.delete();
+            }
+            throw e;
+        } finally {
+            if (output != null) { try { output.close(); } catch (Exception ignored) {} }
+            if (input != null) { try { input.close(); } catch (Exception ignored) {} }
+            conn.disconnect();
+        }
+    }
+
+    private String videoExtension(String url) {
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".webm")) return ".webm";
+        if (lower.endsWith(".mkv")) return ".mkv";
+        if (lower.endsWith(".avi")) return ".avi";
+        if (lower.endsWith(".mov")) return ".mov";
+        if (lower.endsWith(".3gp")) return ".3gp";
+        return ".mp4";
     }
 
     private Bitmap downloadBitmap(String url) throws Exception {

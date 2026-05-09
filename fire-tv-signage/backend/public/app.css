@@ -636,6 +636,19 @@ h3 {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
+#libraryMultiCamForm {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+}
+
+#libraryMultiCamForm > button {
+  min-width: 160px;
+}
+
+#libraryMultiCamCameras {
+  min-height: 132px;
+}
+
 .playlist-library {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -684,6 +697,8 @@ h3 {
   border-bottom: 1px solid var(--line);
   background: rgba(246, 248, 251, 0.72);
   padding: 8px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .playlist-thumb,
@@ -712,9 +727,49 @@ h3 {
   object-fit: cover;
 }
 
+.web-thumb {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+.web-thumb-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 233px;
+  border: 0;
+  transform: scale(0.18);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.web-thumb-label {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+  background: rgba(24, 34, 48, 0.72);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 6px;
+}
+
 .playlist-card-actions button {
   min-height: 34px;
   box-shadow: none;
+}
+
+.playlist-card-actions {
+  flex-wrap: wrap;
+}
+
+.playlist-card-actions button {
+  flex: 1 1 72px;
+  min-width: 0;
+  padding: 0 10px;
 }
 
 .playlist {
@@ -737,6 +792,18 @@ h3 {
   min-height: 220px;
   border-radius: 12px;
   border: 1px solid var(--line);
+}
+
+.web-live-hero {
+  overflow: hidden;
+}
+
+.web-live-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  border: 0;
+  background: #fff;
 }
 
 .live-preview-compact {
@@ -1093,6 +1160,40 @@ h3 {
   .display-list {
     position: static;
   }
+
+  .display-workspace {
+    min-height: 0;
+  }
+
+  .settings-grid {
+    padding: 16px;
+  }
+
+  .upload-zone,
+  .playlist-manager,
+  .playlist,
+  .danger-zone {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .playlist-controls {
+    gap: 10px;
+  }
+
+  .compact-form > button,
+  .compact-form.override-form > button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .playlist-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .playlist-card-actions button {
+    flex: 1 1 120px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1124,5 +1225,109 @@ h3 {
 
   .asset-grid {
     grid-template-columns: 1fr;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .save-state {
+    min-width: 0;
+    max-width: calc(100vw - 100px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pairing-band {
+    padding: 14px;
+  }
+
+  button,
+  input,
+  select {
+    min-height: 46px;
+  }
+
+  .display-list {
+    padding: 10px;
+  }
+
+  .display-row-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .display-delete-button {
+    min-height: 38px;
+  }
+
+  .detail-head {
+    padding: 16px;
+  }
+
+  .detail-title h2 {
+    font-size: 20px;
+  }
+
+  .playlist-manager-head {
+    gap: 10px;
+  }
+
+  .playlist-manager-head .live-badge {
+    position: sticky;
+    bottom: 10px;
+    z-index: 2;
+    align-self: flex-end;
+    box-shadow: 0 8px 20px rgba(24, 34, 48, 0.22);
+  }
+
+  .meta-row {
+    flex-wrap: wrap;
+  }
+
+  .live-hero {
+    min-height: 150px;
+  }
+
+  .asset-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .asset-actions button {
+    flex: 1 1 auto;
+  }
+
+  .playlist-card-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), #fff);
+    border-top: 1px solid var(--line);
+  }
+
+  .playlist-card-actions button,
+  .danger-zone button,
+  .settings-grid button {
+    min-height: 48px;
+  }
+
+  .compact-form,
+  .compact-form.override-form {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .playlist,
+  .playlist-manager {
+    scroll-margin-top: 10px;
+  }
+
+  .toast {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-width: none;
   }
 }

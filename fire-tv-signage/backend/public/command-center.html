@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Family Command Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0a0e17; color: #e4eaf2; font-family: 'Inter', sans-serif; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 420px;
+      grid-template-rows: 220px 1fr 1fr;
+      gap: 16px;
+      padding: 20px 24px;
+      height: 1080px;
+    }
+
+    /* ── Clock ───────────────────────────────── */
+    .clock-panel {
+      grid-column: 1 / 3;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 24px 40px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .time { font-family: 'JetBrains Mono', monospace; font-size: 88px; font-weight: 600; color: #fff; line-height: 1; letter-spacing: -2px; }
+    .date-str { font-size: 22px; color: #6b7d93; font-weight: 500; margin-top: 8px; }
+
+    /* ── Weather ─────────────────────────────── */
+    .weather-panel {
+      grid-column: 3;
+      grid-row: 1 / 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 20px 28px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .section-label { font-size: 12px; font-weight: 700; letter-spacing: 1.8px; color: #3d5570; text-transform: uppercase; margin-bottom: 10px; }
+    .weather-main { display: flex; align-items: center; gap: 16px; }
+    .weather-icon { font-size: 52px; line-height: 1; }
+    .temp-big { font-size: 64px; font-weight: 700; color: #fff; }
+    .weather-desc { font-size: 18px; color: #8899b0; margin-top: 4px; }
+    .weather-row { display: flex; gap: 18px; margin-top: 12px; }
+    .wdetail { font-size: 14px; color: #6b7d93; }
+    .feels { font-size: 13px; color: #4a5a6a; margin-top: 6px; }
+
+    /* ── Calendar ───────────────────────────── */
+    .calendar-panel {
+      grid-column: 1 / 3;
+      padding: 20px 28px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .events-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; overflow-y: auto; max-height: 280px; }
+    .event-item {
+      display: flex; align-items: center; gap: 16px;
+      padding: 10px 16px; background: #162035; border-radius: 10px;
+      border-left: 4px solid #2563eb;
+    }
+    .event-time { font-size: 17px; font-weight: 600; color: #60a5fa; min-width: 80px; }
+    .event-summary { font-size: 18px; font-weight: 500; }
+
+    /* ── Family ─────────────────────────────── */
+    .family-panel {
+      grid-column: 3;
+      grid-row: 2 / 4;
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .family-member { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #111d2e; }
+    .family-member:last-child { border-bottom: none; }
+    .avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .chris { background: #2563eb; } .amanda { background: #db2777; } .franklin { background: #16a34a; } .mae { background: #f59e0b; }
+    .member-name { font-size: 17px; font-weight: 600; }
+    .member-status { font-size: 14px; color: #6b7d93; margin-top: 2px; }
+    .member-loc { font-size: 13px; color: #4a5a6a; margin-top: 1px; }
+
+    /* ── Upcoming ───────────────────────────── */
+    .upcoming-panel {
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .upcoming-item { display: flex; align-items: center; gap: 14px; padding: 7px 0; border-bottom: 1px solid #111d2e; }
+    .upcoming-item:last-child { border-bottom: none; }
+    .upcoming-date { font-size: 14px; color: #5a6a7a; min-width: 70px; flex-shrink: 0; }
+    .upcoming-summary { font-size: 16px; font-weight: 500; }
+
+    /* ── Tonight ─────────────────────────────── */
+    .tonight-panel {
+      padding: 20px 24px;
+      background: linear-gradient(135deg, #0d1a2d, #162035);
+      border-radius: 18px;
+      border: 1px solid #1e3050;
+    }
+    .tonight-section { margin-bottom: 14px; }
+    .tonight-section:last-child { margin-bottom: 0; }
+    .tonight-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; color: #3d5570; text-transform: uppercase; margin-bottom: 6px; }
+    .tonight-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+    .tonight-icon { font-size: 16px; }
+    .tonight-text { font-size: 15px; color: #8899b0; }
+
+    .footer { position: fixed; bottom: 10px; right: 20px; font-size: 11px; color: #2a3a4a; }
+  </style>
+</head>
+<body>
+
+<div class="grid">
+
+  <!-- Clock -->
+  <div class="clock-panel">
+    <div class="time" id="clock">--:--:--</div>
+    <div class="date-str" id="date-str">Loading...</div>
+  </div>
+
+  <!-- Weather -->
+  <div class="weather-panel">
+    <div class="section-label">Current Weather · Fultondale</div>
+    <div class="weather-main">
+      <span class="weather-icon" id="weather-icon">⛅</span>
+      <div>
+        <div class="temp-big" id="temp">--°</div>
+        <div class="weather-desc" id="weather-desc">Loading...</div>
+      </div>
+    </div>
+    <div class="weather-row">
+      <span class="wdetail">💧 <span id="humidity">--%</span></span>
+      <span class="wdetail">💨 <span id="wind">-- mph</span></span>
+      <span class="wdetail">☀️ <span id="uv">UV --</span></span>
+    </div>
+    <div class="feels">Feels like <span id="feels">--°</span></div>
+  </div>
+
+  <!-- Calendar -->
+  <div class="calendar-panel">
+    <div class="section-label">Today · Family Calendar</div>
+    <div class="events-list" id="calendar-events">
+      <div class="event-item"><span class="event-time">--:--</span><span class="event-summary">Loading...</span></div>
+    </div>
+  </div>
+
+  <!-- Family -->
+  <div class="family-panel">
+    <div class="section-label">Family</div>
+    <div class="family-member">
+      <div class="avatar chris">CC</div>
+      <div class="member-info"><div class="member-name">Chris</div><div class="member-status" id="chris-status">Home · Working</div><div class="member-loc" id="chris-loc"></div></div>
+    </div>
+    <div class="family-member">
+      <div class="avatar amanda">AC</div>
+      <div class="member-info"><div class="member-name">Amanda Claire</div><div class="member-status" id="amanda-status">Work · 9–5</div><div class="member-loc" id="amanda-loc"></div></div>
+    </div>
+    <div class="family-member">
+      <div class="avatar franklin">FR</div>
+      <div class="member-info"><div class="member-name">Franklin</div><div class="member-status" id="franklin-status">School</div><div class="member-loc">Fultondale Elementary</div></div>
+    </div>
+    <div class="family-member">
+      <div class="avatar mae">MA</div>
+      <div class="member-info"><div class="member-name">Mae</div><div class="member-status" id="mae-status">School</div><div class="member-loc" id="mae-loc"></div></div>
+    </div>
+  </div>
+
+  <!-- Upcoming This Week -->
+  <div class="upcoming-panel">
+    <div class="section-label">Up Next · This Week</div>
+    <div id="upcoming-list">
+      <div class="upcoming-item"><div class="upcoming-date">—</div><div class="upcoming-summary">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- Tonight -->
+  <div class="tonight-panel">
+    <div class="section-label">Tonight</div>
+    <div class="tonight-section">
+      <div class="tonight-label">Evening Plans</div>
+      <div class="tonight-row"><span class="tonight-icon">🏃</span><span class="tonight-text" id="run-group-status">—</span></div>
+    </div>
+    <div class="tonight-section">
+      <div class="tonight-label">Dinner</div>
+      <div class="tonight-row"><span class="tonight-icon">🍽️</span><span class="tonight-text" id="dinner-text">—</span></div>
+    </div>
+    <div class="tonight-section">
+      <div class="tonight-label">Family</div>
+      <div class="tonight-row"><span class="tonight-icon">👨‍👩‍👧‍👦</span><span class="tonight-text" id="family-evening">Home together</span></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Family Command Center</div>
+
+<script>
+  const DATA_SERVER = "http://192.168.2.90:8891";
+
+  function updateClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    document.getElementById('clock').textContent = `${h12}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')} ${ampm}`;
+
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('date-str').textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+
+    updateFamilyLocations(now);
+    refreshDashboardData();
+  }
+
+  function refreshDashboardData() {
+    fetch(`${DATA_SERVER}/data`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        updateCalendar(data.today || []);
+        updateUpcoming(data.week || []);
+        updateTonight(data.today || []);
+        updateWeather(data.weather || null);
+      })
+      .catch(err => console.warn("Data fetch failed:", err));
+  }
+
+  function updateCalendar(events) {
+    const container = document.getElementById('calendar-events');
+    if (!events || events.length === 0) {
+      container.innerHTML = '<div class="event-item"><span class="event-time">—</span><span class="event-summary">No events today</span></div>';
+      return;
+    }
+    container.innerHTML = events.map(ev => `
+      <div class="event-item">
+        <span class="event-time">${ev.time}</span>
+        <span class="event-summary">${ev.summary}</span>
+      </div>
+    `).join('');
+  }
+
+  function updateUpcoming(events) {
+    const container = document.getElementById('upcoming-list');
+    if (!events || events.length === 0) {
+      container.innerHTML = '<div class="upcoming-item"><div class="upcoming-date">—</div><div class="upcoming-summary">No upcoming events</div></div>';
+      return;
+    }
+    // Show next 5 events after now
+    const now = new Date();
+    const upcoming = events.slice(0, 8).map(ev => {
+      const dayStr = ev.dayStr || '';
+      return `<div class="upcoming-item">
+        <div class="upcoming-date">${dayStr} ${ev.time}</div>
+        <div class="upcoming-summary">${ev.summary}</div>
+      </div>`;
+    }).join('');
+    container.innerHTML = upcoming;
+  }
+
+  function updateTonight(todayEvents) {
+    // Run Group check
+    const runEvent = todayEvents.find(e => e.summary.toLowerCase().includes('run'));
+    document.getElementById('run-group-status').textContent = runEvent
+      ? `Run Group — ${runEvent.time}`
+      : '—';
+  }
+
+  function updateWeather(w) {
+    if (!w) return;
+    document.getElementById('temp').textContent = w.temp + '°';
+    document.getElementById('weather-desc').textContent = w.condition;
+    document.getElementById('humidity').textContent = w.humidity + '%';
+    document.getElementById('wind').textContent = w.wind + ' mph ' + w.windDir;
+    document.getElementById('uv').textContent = 'UV ' + w.uv;
+    document.getElementById('feels').textContent = w.feelsLike + '°';
+
+    const cond = (w.condition || '').toLowerCase();
+    const iconEl = document.getElementById('weather-icon');
+    if (cond.includes('sun') || cond.includes('clear')) iconEl.textContent = '☀️';
+    else if (cond.includes('cloud') || cond.includes('overcast')) iconEl.textContent = '⛅';
+    else if (cond.includes('rain') || cond.includes('drizzle')) iconEl.textContent = '🌧️';
+    else if (cond.includes('thunder') || cond.includes('storm')) iconEl.textContent = '⛈️';
+    else if (cond.includes('snow')) iconEl.textContent = '❄️';
+    else if (cond.includes('fog') || cond.includes('mist')) iconEl.textContent = '🌫️';
+    else iconEl.textContent = '⛅';
+  }
+
+  function updateFamilyLocations(now) {
+    const h = now.getHours();
+    const day = now.getDay();
+
+    const chrisStatus = document.getElementById('chris-status');
+    const chrisLoc = document.getElementById('chris-loc');
+    if (h >= 17 || h < 7) {
+      chrisStatus.textContent = 'Home';
+      chrisLoc.textContent = '';
+    } else {
+      chrisStatus.textContent = 'Home · Working';
+      chrisLoc.textContent = 'Remote';
+    }
+
+    const amandaStatus = document.getElementById('amanda-status');
+    const amandaLoc = document.getElementById('amanda-loc');
+    if (h >= 9 && h < 17 && day >= 1 && day <= 5) {
+      amandaStatus.textContent = 'Work · 9–5';
+      amandaLoc.textContent = '';
+    } else {
+      amandaStatus.textContent = 'Home';
+      amandaLoc.textContent = '';
+    }
+
+    const franklinStatus = document.getElementById('franklin-status');
+    const maeStatus = document.getElementById('mae-status');
+    const maeLoc = document.getElementById('mae-loc');
+    if (h >= 8 && h < 15 && day >= 1 && day <= 5) {
+      franklinStatus.textContent = 'School';
+      maeStatus.textContent = 'School';
+      maeLoc.textContent = '';
+    } else {
+      franklinStatus.textContent = 'Home';
+      maeStatus.textContent = 'Home';
+      maeLoc.textContent = '';
+    }
+
+    const familyEvening = document.getElementById('family-evening');
+    if (h >= 17 && day >= 1 && day <= 5) {
+      familyEvening.textContent = 'Amanda Claire arrives home ~5 PM';
+    } else if (h >= 17 && (day === 0 || day === 6)) {
+      familyEvening.textContent = 'Weekend — everyone home';
+    } else {
+      familyEvening.textContent = 'Home together';
+    }
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+  setInterval(refreshDashboardData, 5 * 60 * 1000);
+  setTimeout(() => location.reload(), 15 * 60 * 1000);
+</script>
+
+</body>
+</html>

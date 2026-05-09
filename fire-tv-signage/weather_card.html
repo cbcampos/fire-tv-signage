@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather Card</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  position: relative;
+  background: #0a1628;
+}
+
+/* Dark atmospheric sky background */
+.sky-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    #0d1b2a 0%,
+    #1b263b 20%,
+    #274c5e 40%,
+    #2d6a4f 60%,
+    #40916c 75%,
+    #74a57f 85%,
+    #b5c99a 95%,
+    #e9c46a 100%
+  );
+}
+
+/* Subtle grid overlay */
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.glass-card {
+  position: absolute;
+  bottom: 40px;
+  left: 40px;
+  right: 40px;
+  background: rgba(13, 27, 42, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 28px;
+  padding: 36px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* Top row: current conditions + daily forecast */
+.top-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+}
+
+/* Left: current weather */
+.current-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.location {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.date-time {
+  font-size: 15px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+.temp-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.temp-main {
+  font-size: 120px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -4px;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+
+.temp-main .deg { font-size: 64px; font-weight: 300; letter-spacing: -2px; vertical-align: top; }
+
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.condition-text {
+  font-size: 20px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.85);
+}
+
+.feels-like {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+  margin-top: 4px;
+}
+
+/* Right: 7-day forecast */
+.forecast-row {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  align-items: stretch;
+}
+
+.day-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 12px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  position: relative;
+}
+
+.day-card:last-child { border-right: none; }
+
+.day-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.day-name.today {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.weather-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.weather-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.temp-high {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.temp-low {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.4);
+}
+
+/* Alert badge */
+.alert-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  background: #e63946;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+}
+
+/* Bottom metrics bar */
+.metrics-row {
+  display: flex;
+  gap: 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.metric {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.metric:last-child { border-right: none; }
+
+.metric-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.metric-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-value .unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+}
+
+.metric-icon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.7;
+}
+
+/* Top-left time badge */
+.time-badge {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.time-display {
+  font-size: 48px;
+  font-weight: 300;
+  color: #ffffff;
+  line-height: 1;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  letter-spacing: -1px;
+}
+
+.time-display .ampm {
+  font-size: 20px;
+  font-weight: 500;
+  vertical-align: super;
+  opacity: 0.7;
+}
+
+.date-display {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.05em;
+}
+</style>
+</head>
+<body>
+
+<div class="sky-bg"></div>
+<div class="grid-overlay"></div>
+
+<!-- Time badge top-left -->
+<div class="time-badge">
+  <div class="time-display">
+    <span id="time-val">10:13</span><span class="ampm" id="ampm-val">PM</span>
+  </div>
+  <div class="date-display" id="date-val">Tuesday, May 5</div>
+</div>
+
+<!-- Main glass card -->
+<div class="glass-card">
+
+  <div class="top-row">
+
+    <!-- Current conditions -->
+    <div class="current-block">
+      <div class="location" id="location-val">BIRMINGHAM, AL</div>
+      <div class="date-time" id="datetime-val">Tuesday, May 5 · 10:13 PM</div>
+      <div class="temp-row">
+        <div class="temp-main">
+          <span id="temp-val">72</span><span class="deg">°</span>
+        </div>
+      </div>
+      <div class="condition-row">
+        <span class="condition-text" id="condition-val">Partly Cloudy</span>
+      </div>
+      <div class="feels-like">Feels like <span id="feelslike-val">76</span>°F</div>
+    </div>
+
+    <!-- 7-day forecast -->
+    <div class="forecast-row" id="forecast-row">
+      <!-- populated by JS -->
+    </div>
+
+  </div>
+
+  <!-- Metrics row -->
+  <div class="metrics-row">
+    <div class="metric">
+      <div class="metric-label">Humidity</div>
+      <div class="metric-value">
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+        <span id="humidity-val">55</span><span class="unit">%</span>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Wind</div>
+      <div class="metric-value">
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>
+        </svg>
+        <span id="wind-val">9</span><span class="unit">mph <span id="winddir-val">S</span></span>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">UV Index</div>
+      <div class="metric-value">
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <span id="uv-val">0</span>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Visibility</div>
+      <div class="metric-value">
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span id="vis-val">9</span><span class="unit">mi</span>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Pressure</div>
+      <div class="metric-value">
+        <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+        <span id="pressure-val">30.0</span><span class="unit">in</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Weather icons as inline SVG
+const icons = {
+  sunny: `<svg viewBox="0 0 64 64" fill="none"><circle cx="32" cy="32" r="12" fill="#FFD93D" stroke="#FFB800" stroke-width="2"/><line x1="32" y1="6" x2="32" y2="14" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="32" y1="50" x2="32" y2="58" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="6" y1="32" x2="14" y2="32" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="50" y1="32" x2="58" y2="32" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="13.5" y1="13.5" x2="19.3" y2="19.3" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="44.7" y1="44.7" x2="50.5" y2="50.5" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="13.5" y1="50.5" x2="19.3" y2="44.7" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/><line x1="44.7" y1="19.3" x2="50.5" y2="13.5" stroke="#FFD93D" stroke-width="3" stroke-linecap="round"/></svg>`,
+  partly_cloudy: `<svg viewBox="0 0 64 64" fill="none"><circle cx="24" cy="28" r="10" fill="#FFD93D" stroke="#FFB800" stroke-width="1.5"/><line x1="24" y1="8" x2="24" y2="13" stroke="#FFD93D" stroke-width="2.5" stroke-linecap="round"/><line x1="8" y1="28" x2="13" y2="28" stroke="#FFD93D" stroke-width="2.5" stroke-linecap="round"/><line x1="11" y1="15" x2="15" y2="19" stroke="#FFD93D" stroke-width="2.5" stroke-linecap="round"/><path d="M52 40H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(255,255,255,0.7)" stroke="rgba(255,255,255,0.9)" stroke-width="1.5"/><circle cx="36" cy="22" r="8" fill="#B0C4DE" stroke="#8FAABE" stroke-width="1.5"/></svg>`,
+  cloudy: `<svg viewBox="0 0 64 64" fill="none"><path d="M52 40H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(255,255,255,0.8)" stroke="rgba(255,255,255,0.95)" stroke-width="1.5"/></svg>`,
+  rain: `<svg viewBox="0 0 64 64" fill="none"><path d="M52 32H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(180,190,210,0.9)" stroke="rgba(150,165,195,0.9)" stroke-width="1.5"/><line x1="20" y1="54" x2="16" y2="62" stroke="#6EA0D8" stroke-width="2.5" stroke-linecap="round"/><line x1="32" y1="54" x2="28" y2="62" stroke="#6EA0D8" stroke-width="2.5" stroke-linecap="round"/><line x1="44" y1="54" x2="40" y2="62" stroke="#6EA0D8" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+  storm: `<svg viewBox="0 0 64 64" fill="none"><path d="M52 30H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(80,90,110,0.9)" stroke="rgba(60,70,90,0.9)" stroke-width="1.5"/><path d="M30 42l-6 10h8l-6 10" stroke="#FFD93D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  snow: `<svg viewBox="0 0 64 64" fill="none"><path d="M52 32H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(200,215,235,0.9)" stroke="rgba(170,190,215,0.9)" stroke-width="1.5"/><circle cx="20" cy="56" r="3" fill="#DDEEFF"/><circle cx="32" cy="58" r="3" fill="#DDEEFF"/><circle cx="44" cy="56" r="3" fill="#DDEEFF"/></svg>`,
+  night_clear: `<svg viewBox="0 0 64 64" fill="none"><path d="M40 16a16 16 0 1 0 0 32 12 12 0 0 1 0-32z" fill="#C4C4D0" stroke="#A0A09A" stroke-width="1.5"/></svg>`,
+  night_cloudy: `<svg viewBox="0 0 64 64" fill="none"><path d="M52 40H18c-5.5 0-10 4.5-10 10s4.5 10 10 10h28c5.5 0 10-4.5 10-10 0-4.6-3.1-8.4-7.3-9.6" fill="rgba(100,110,130,0.9)" stroke="rgba(80,90,110,0.9)" stroke-width="1.5"/><path d="M36 20a10 10 0 1 0 0 20 8 8 0 0 1 0-20z" fill="#C4C4D0" stroke="#A0A09A" stroke-width="1.5"/></svg>`,
+  fog: `<svg viewBox="0 0 64 64" fill="none"><line x1="10" y1="26" x2="54" y2="26" stroke="rgba(200,210,220,0.8)" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="34" x2="50" y2="34" stroke="rgba(200,210,220,0.7)" stroke-width="2.5" stroke-linecap="round"/><line x1="8" y1="42" x2="56" y2="42" stroke="rgba(200,210,220,0.6)" stroke-width="2.5" stroke-linecap="round"/></svg>`,
+};
+
+function getWeatherIcon(code, isDay) {
+  const map = {
+    113: isDay ? 'sunny' : 'night_clear',
+    116: isDay ? 'partly_cloudy' : 'night_cloudy',
+    119: 'cloudy',
+    122: 'fog',
+    143: 'fog',
+    176: 'rain',
+    185: 'rain',
+    200: 'storm',
+    227: 'snow',
+    230: 'snow',
+    248: 'fog',
+    260: 'fog',
+    263: 'rain',
+    266: 'rain',
+    281: 'rain',
+    293: 'rain',
+    296: 'rain',
+    299: 'rain',
+    302: 'rain',
+    305: 'rain',
+    308: 'rain',
+    311: 'rain',
+    314: 'rain',
+    353: 'rain',
+    362: 'rain',
+    365: 'rain',
+    374: 'rain',
+    377: 'rain',
+  };
+  return icons[map[code] || (isDay ? 'partly_cloudy' : 'night_cloudy') ;
+}
+
+const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const dayAbbrev = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+function renderForecast(forecast) {
+  const container = document.getElementById('forecast-row');
+  container.innerHTML = '';
+  const today = new Date().getDay();
+
+  forecast.forEach((day, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dayOfWeek = d.getDay();
+    const isToday = i === 0;
+    const name = isToday ? 'TODAY' : dayAbbrev[dayOfWeek];
+
+    const iconHtml = `<div class="weather-icon">${getWeatherIcon(day.weatherCode, i < 2)}</div>`;
+    const high = Math.round(day.maxTempF);
+    const low = Math.round(day.minTempF);
+
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    card.innerHTML = `
+      <div class="day-name ${isToday ? 'today' : ''}">${name}</div>
+      ${iconHtml}
+      <div class="temp-high">${high}°</div>
+      <div class="temp-low">${low}°</div>
+    `;
+    container.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
