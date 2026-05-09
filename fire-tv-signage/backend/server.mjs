@@ -14,6 +14,8 @@ const PORT = Number(process.env.PORT || 3002);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
 const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
+const WYZE_BRIDGE_URL = process.env.WYZE_BRIDGE_URL || "http://192.168.2.90:1984";
+const WYZE_BRIDGE_API_URL = process.env.WYZE_BRIDGE_API_URL || WYZE_BRIDGE_URL.replace(/:1984$/, ":5080");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -200,6 +202,8 @@ async function routeApi(req, res, url) {
       name: libraryItem.name,
       path: libraryItem.path,
       isVideo: libraryItem.type === "video",
+      isWeb: libraryItem.type === "web" || libraryItem.type === "wyze",
+      webUrl: libraryItem.webUrl || null,
       isYouTube: libraryItem.type === "youtube",
       youtubeUrl: libraryItem.youtubeUrl || null,
       delaySeconds: null,
@@ -424,6 +428,97 @@ async function routeApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library" && parts[3] === "web") {
+    const body = await readJson(req);
+    const webUrl = String(body.webUrl || "").trim();
+    if (!isValidHttpUrl(webUrl)) {
+      sendJson(res, 400, { error: "Valid http/https URL required." });
+      return;
+    }
+    const item = {
+      id: crypto.randomUUID(),
+      name: String(body.name || "Web Page").trim().slice(0, 120) || "Web Page",
+      type: "web",
+      webUrl,
+      tags: Array.isArray(body.tags) ? body.tags : [],
+      addedAt: new Date().toISOString()
+    };
+    db.library.push(item);
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "GET" && parts[1] === "admin" && parts[2] === "wyze" && parts[3] === "cameras") {
+    try {
+      const cameras = await fetchWyzeCameras(url.searchParams.get("bridgeUrl"));
+      sendJson(res, 200, { ok: true, cameras });
+    } catch (error) {
+      sendJson(res, 502, { error: "Failed to query Wyze cameras.", detail: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library" && parts[3] === "wyze") {
+    const body = await readJson(req);
+    const cameraName = String(body.cameraName || "").trim();
+    if (!cameraName) {
+      sendJson(res, 400, { error: "cameraName is required." });
+      return;
+    }
+    const bridgeUrl = normalizeBridgeUrl(body.bridgeUrl);
+    const mode = String(body.mode || "mse,webrtc,hls").trim() || "mse,webrtc,hls";
+    const source = (await fetchWyzeCameras(body.bridgeUrl)).find((camera) => camera.name === cameraName) || null;
+    const webUrl = `${bridgeUrl}/stream.html?src=${encodeURIComponent(cameraName)}&mode=${encodeURIComponent(mode)}`;
+    const item = {
+      id: crypto.randomUUID(),
+      name: String(body.name || `Wyze: ${cameraName}`).trim().slice(0, 120) || `Wyze: ${cameraName}`,
+      type: "wyze",
+      webUrl,
+      wyzeCameraName: cameraName,
+      wyzeMode: mode,
+      snapshotUrl: source?.thumbnail || source?.snapshot_url || null,
+      tags: Array.isArray(body.tags) ? body.tags : ["wyze-camera"],
+      addedAt: new Date().toISOString()
+    };
+    db.library.push(item);
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "library" && parts[3] === "multicam") {
+    const body = await readJson(req);
+    const names = Array.isArray(body.cameraNames)
+      ? body.cameraNames.map((name) => String(name || "").trim()).filter(Boolean)
+      : [];
+    if (!names.length) {
+      sendJson(res, 400, { error: "cameraNames must include at least one camera." });
+      return;
+    }
+    const bridgeUrl = normalizeBridgeUrl(body.bridgeUrl);
+    const mode = String(body.mode || "hls,mse,webrtc").trim() || "hls,mse,webrtc";
+    const cols = clamp(Number(body.cols || 2), 1, 4);
+    const title = String(body.title || "Wyze Multi-Cam").trim().slice(0, 80) || "Wyze Multi-Cam";
+    const base = publicBase(req);
+    const multicamUrl =
+      `${base}/multicam.html?cams=${encodeURIComponent(names.join(","))}` +
+      `&bridge=${encodeURIComponent(bridgeUrl)}&mode=${encodeURIComponent(mode)}` +
+      `&cols=${encodeURIComponent(String(cols))}&title=${encodeURIComponent(title)}`;
+    const item = {
+      id: crypto.randomUUID(),
+      name: String(body.name || title).trim().slice(0, 120) || title,
+      type: "web",
+      webUrl: multicamUrl,
+      tags: Array.isArray(body.tags) ? body.tags : ["wyze-camera", "multicam"],
+      addedAt: new Date().toISOString()
+    };
+    db.library.push(item);
+    saveDb();
+    sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
   if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "library" && parts[3]) {
     const id = parts[3];
     const idx = db.library.findIndex((i) => i.id === id);
@@ -504,8 +599,18 @@ async function routeApi(req, res, url) {
     }
     device.activePlaylistId = playlistId;
     device.liveOverride = null;
+    device.liveOverrideUntil = null;
     saveDb();
     sendJson(res, 200, { ok: true, device });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "refresh-live") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    device.liveRefreshToken = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    saveDb();
+    sendJson(res, 200, { ok: true, liveRefreshToken: device.liveRefreshToken });
     return;
   }
 
@@ -539,6 +644,7 @@ async function routeApi(req, res, url) {
     const body = await readJson(req, 30 * 1024 * 1024);
     const item = saveDataUrlImage(body.name, body.dataUrl);
     device.liveOverride = item;
+    device.liveOverrideUntil = null;
     saveDb();
     sendJson(res, 200, { ok: true, item });
     return;
@@ -558,6 +664,7 @@ async function routeApi(req, res, url) {
       createdAt: new Date().toISOString()
     };
     device.liveOverride = item;
+    device.liveOverrideUntil = null;
     saveDb();
     sendJson(res, 200, { ok: true, item });
     return;
@@ -574,14 +681,43 @@ async function routeApi(req, res, url) {
       name: libraryItem.name,
       path: libraryItem.path,
       isVideo: libraryItem.type === "video",
+      isWeb: libraryItem.type === "web" || libraryItem.type === "wyze",
+      webUrl: libraryItem.webUrl || null,
       isYouTube: libraryItem.type === "youtube",
       youtubeUrl: libraryItem.youtubeUrl || null,
       delaySeconds: null,
       createdAt: new Date().toISOString()
     };
     device.liveOverride = item;
+    device.liveOverrideUntil = null;
     saveDb();
     sendJson(res, 200, { ok: true, item });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "devices" && parts[3] && parts[4] === "override-library-temporary") {
+    const device = db.devices[parts[3]];
+    if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const body = await readJson(req);
+    const libraryItem = db.library.find((entry) => entry.id === body.libraryItemId);
+    if (!libraryItem) { sendJson(res, 404, { error: "Library item not found." }); return; }
+    const durationSeconds = clamp(Number(body.durationSeconds || 30), 2, 3600);
+    const item = {
+      id: crypto.randomUUID(),
+      name: libraryItem.name,
+      path: libraryItem.path,
+      isVideo: libraryItem.type === "video",
+      isWeb: libraryItem.type === "web" || libraryItem.type === "wyze",
+      webUrl: libraryItem.webUrl || null,
+      isYouTube: libraryItem.type === "youtube",
+      youtubeUrl: libraryItem.youtubeUrl || null,
+      delaySeconds: null,
+      createdAt: new Date().toISOString()
+    };
+    device.liveOverride = item;
+    device.liveOverrideUntil = new Date(Date.now() + durationSeconds * 1000).toISOString();
+    saveDb();
+    sendJson(res, 200, { ok: true, item, liveOverrideUntil: device.liveOverrideUntil, durationSeconds });
     return;
   }
 
@@ -589,6 +725,7 @@ async function routeApi(req, res, url) {
     const device = db.devices[parts[3]];
     if (!device) { sendJson(res, 404, { error: "Device not found." }); return; }
     device.liveOverride = null;
+    device.liveOverrideUntil = null;
     saveDb();
     sendJson(res, 200, { ok: true });
     return;
@@ -734,6 +871,13 @@ function handleReceiverPlaylist(req, res, url, deviceId) {
     return;
   }
   device.lastSeenAt = new Date().toISOString();
+  if (device.liveOverride && device.liveOverrideUntil) {
+    const expiresAt = Date.parse(device.liveOverrideUntil);
+    if (Number.isFinite(expiresAt) && Date.now() >= expiresAt) {
+      device.liveOverride = null;
+      device.liveOverrideUntil = null;
+    }
+  }
   saveDb();
   let items = [];
   if (device.liveOverride) {
@@ -744,7 +888,12 @@ function handleReceiverPlaylist(req, res, url, deviceId) {
   } else {
     items = [];
   }
-  sendJson(res, 200, { delaySeconds: device.delaySeconds, items, images: items });
+  sendJson(res, 200, {
+    delaySeconds: device.delaySeconds,
+    refreshToken: device.liveRefreshToken || "",
+    items,
+    images: items
+  });
 }
 
 function adminState(req) {
@@ -797,6 +946,8 @@ function loadDb() {
       if (!Array.isArray(device.videos)) device.videos = [];
       if (device.activePlaylistId === undefined) device.activePlaylistId = null;
       if (device.liveOverride === undefined) device.liveOverride = null;
+      if (device.liveOverrideUntil === undefined) device.liveOverrideUntil = null;
+      if (device.liveRefreshToken === undefined) device.liveRefreshToken = "";
     }
     for (const playlist of data.playlists) {
       if (!Array.isArray(playlist.items)) playlist.items = [];
@@ -910,6 +1061,9 @@ function findPlaylist(id) {
 }
 
 function normalizePlaylistItem(item) {
+  if (item.isWeb) {
+    return { id: item.id, name: item.name, type: "web", webUrl: item.webUrl || item.url || item.path || "", delaySeconds: item.delaySeconds ?? null };
+  }
   if (item.isYouTube) {
     return { id: item.id, name: item.name, type: "youtube", youtubeUrl: item.youtubeUrl, delaySeconds: item.delaySeconds ?? null };
   }
@@ -919,11 +1073,47 @@ function normalizePlaylistItem(item) {
   return { id: item.id, name: item.name, type: "image", url: item.path, delaySeconds: item.delaySeconds ?? null };
 }
 
+function normalizeBridgeUrl(overrideUrl) {
+  return String(overrideUrl || WYZE_BRIDGE_URL).trim().replace(/\/$/, "");
+}
+
+async function fetchWyzeCameras(overrideUrl) {
+  const bridgeApiUrl = String(overrideUrl || WYZE_BRIDGE_API_URL).trim().replace(/\/$/, "");
+  let response = await fetch(`${bridgeApiUrl}/api/cameras`, { signal: AbortSignal.timeout(5000) });
+  if (response.status === 404 && bridgeApiUrl.endsWith(":1984")) {
+    const fallback = bridgeApiUrl.replace(":1984", ":5080");
+    response = await fetch(`${fallback}/api/cameras`, { signal: AbortSignal.timeout(5000) });
+  }
+  if (!response.ok) {
+    throw new Error(`Wyze Bridge returned ${response.status}`);
+  }
+  const payload = await response.json();
+  if (!Array.isArray(payload)) {
+    throw new Error("Unexpected Wyze Bridge response shape.");
+  }
+  return payload.map((camera) => ({
+    name: String(camera?.name || ""),
+    nickname: String(camera?.nickname || camera?.name || ""),
+    status: String(camera?.status || "unknown"),
+    enabled: Boolean(camera?.enabled),
+    thumbnail: camera?.thumbnail || camera?.snapshot_url || null
+  })).filter((camera) => camera.name);
+}
+
 function deviceItems(device) {
   const items = [];
   for (const img of (device.images || [])) items.push(normalizePlaylistItem(img));
   for (const vid of (device.videos || [])) items.push(normalizePlaylistItem(vid));
   return items;
+}
+
+function isValidHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 async function readJson(req, maxBytes = 1024 * 1024) {
@@ -950,7 +1140,10 @@ function sendJson(res, status, body) {
 }
 
 function serveStatic(res, requestPath) {
-  const clean = requestPath === "/" ? "/index.html" : requestPath;
+  let clean = requestPath === "/" ? "/index.html" : requestPath;
+  if (clean === "/v2" || clean === "/v2/") {
+    clean = "/v2/index.html";
+  }
   serveFile(res, path.join(PUBLIC_DIR, decodeURIComponent(clean)));
 }
 
