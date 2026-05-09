@@ -113,6 +113,7 @@ python3 skills/firetv/firetv.py discover
 
 | Device | IP | Notes |
 |--------|-----|-------|
-| Living Room Fire TV | `192.168.2.62` | Likely candidate based on ARP |
+| Living Room Google TV | `32d814c9-1917-4cea-9041-3624c9c9fcd1` | Chromecast with Google TV, signage paired ✓ |
+| Living Room Fire TV | `8e8032d5-b1b6-4733-8ea5-dc56633f36b2` | Fire TV Stick (signage) |
 
 > Run `firetv.py discover` to find your Fire TV IP if unsure.

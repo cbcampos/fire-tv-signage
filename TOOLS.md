@@ -1,4 +1,4 @@
-# TOOLS.md - Flaire's Toolkit
+# TOOLS.md - Dobby's Toolkit
 
 ## Never Do
 
@@ -37,81 +37,32 @@
 
 ---
 
-## Quick Commands
+## Image Generation Style
 
-### Content Ideas Generator
-When Amanda Claire needs content for the week, use this framework:
-1. **Hook post** (engagement) — Question, relatable struggle, or "POV" style
-2. **Value post** (education) — Tip, tutorial, style formula, outfit formula
-3. **Social proof** (conversion) — Client transformation, testimonial, review
-4. **Personality post** (connection) — Behind-the-scenes, Amanda Claire's journey, real life
+Chris's default image style is **hand-drawn paper craft** — saved at `memory/image-style-guide.md`. Always use this style for image generations unless Chris specifies a different style explicitly.
 
-### Caption Template
-```
-[HOOK — 1-2 lines that stop the scroll]
-
-[BODY — Value, story, or educational content. 3-8 sentences max.]
-
-[CTA — What do you want them to do? Comment, save, DM, book]
-
-#hashtags [3-5 branded + 15-20 niche/location hashtags]
-```
-
-### Hashtag Strategy
-- **Branded:** #ConfettiCloset #ClosetConfetti #FlaireAmanda (check availability)
-- **Niche:** #PersonalStylist #ClosetStyling #StyleTips #WardrobeGoals
-- **Location:** #BirminghamAL #BirminghamStylist #MagicCityStyle
-
----
-
-## File Locations
-
-- `memory/brand-guide.md` — Brand voice, colors, fonts, messaging
-- `memory/content-calendar.md` — What to post and when
-- `data/client-transformations.md` — Transformation tracking
-- `data/captions-library.md` — Saved caption templates
-
----
-
-## Instagram Best Practices
-
-- Reels get reach, Carousels get saves, Stories get engagement
-- Post 3-5x per week minimum for growth
-- Respond to all DMs/comments within 24h
-- Use all 3 Highlights categories: Services, Transformations, About
-- Link in bio for booking (can use linktree or direct)
-
----
+Key traits: layered cut paper, watercolor texture, soft shadows, warm muted palette (deep green, teal, navy, muted gold, cream). Clean and editorial, not childish. Bold hand-lettered script for text. Default to 16:9.
 
 ## Signage CLI (Fire TV / Google TV receivers)
 
-**CLI location:** `node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs`
+**Rule: Images → `--from-library`. HTML dashboards → `--from-web`.**
 
-**Always use this first** for anything related to signage receivers:
+Always add image files to the library first, then push using `--from-library`. Only use `--from-web` for HTML pages.
 
 ```bash
-# Check all devices and their status
-signage devices
+# Add image to library (do this first)
+node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs library add "/path/to/image.png" --name "Image Name"
 
-# Push a web URL to a specific device
-```bash
-# Push to Google TV (always use --from-web — it auto-deduplicates by name)
-signage push 32d814c9-1917-4cea-9041-3624c9c9fcd1 --from-web "http://192.168.2.90:8888/command-center.html" --name "Family Command Center"
+# Push image from library to a device
+node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs push <device-id> --from-library "Image Name"
 
-# Push to Fire TV (use --from-library to reuse the saved entry)
-signage push 8e8032d5-b1b6-4733-8ea5-dc56633f36b2 --from-library "Family Command Center"
+# Push HTML dashboard (always use --from-web)
+node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs push <device-id> --from-web "http://192.168.2.90:8888/dashboard.html" --name "Dashboard Name"
 ```
-
-**How it works:** `--from-web` checks if a library item with that name exists and deletes it before creating, so you always get a fresh entry — no duplicates.
 
 **Check library:**
 ```bash
-signage library list
-signage library search "Family Command Center"
-```
-
-# Health check
-signage health
+node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs library list
 ```
 
 **Known devices:**
@@ -123,6 +74,11 @@ signage health
 ---
 
 ## Local Dashboards
+
+- **Dashboard server:** Python HTTP server on port 8888, data API on port 8891
+- **Start/restart:** `bash ~/.openclaw/workspace/scripts/start-dashboards.sh`
+- **Data endpoint:** `http://192.168.2.90:8891/data`
+- **Dashboard URL:** `http://192.168.2.90:8888/command-center.html`
 
 ---
 
@@ -190,3 +146,48 @@ sessions_spawn(
 **Tested and working** (2026-05-08):
 - File write + readback ✅
 - OpenClaw tools (read, web_search, multi_tool_use.parallel) confirmed accessible to Codex sub-agent ✅
+
+---
+
+## Content Ideas Generator
+
+When Amanda Claire needs content for the week, use this framework:
+1. **Hook post** (engagement) — Question, relatable struggle, or "POV" style
+2. **Value post** (education) — Tip, tutorial, style formula, outfit formula
+3. **Social proof** (conversion) — Client transformation, testimonial, review
+4. **Personality post** (connection) — Behind-the-scenes, Amanda Claire's journey, real life
+
+### Caption Template
+```
+[HOOK — 1-2 lines that stop the scroll]
+
+[BODY — Value, story, or educational content. 3-8 sentences max.]
+
+[CTA — What do you want them to do? Comment, save, DM, book]
+
+#hashtags [3-5 branded + 15-20 niche/location hashtags]
+```
+
+### Hashtag Strategy
+- **Branded:** #ConfettiCloset #ClosetConfetti #FlaireAmanda (check availability)
+- **Niche:** #PersonalStylist #ClosetStyling #StyleTips #WardrobeGoals
+- **Location:** #BirminghamAL #BirminghamStylist #MagicCityStyle
+
+---
+
+## File Locations
+
+- `memory/brand-guide.md` — Brand voice, colors, fonts, messaging
+- `memory/content-calendar.md` — What to post and when
+- `data/client-transformations.md` — Transformation tracking
+- `data/captions-library.md` — Saved caption templates
+
+---
+
+## Instagram Best Practices
+
+- Reels get reach, Carousels get saves, Stories get engagement
+- Post 3-5x per week minimum for growth
+- Respond to all DMs/comments within 24h
+- Use all 3 Highlights categories: Services, Transformations, About
+- Link in bio for booking (can use linktree or direct)

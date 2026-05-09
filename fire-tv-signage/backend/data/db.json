@@ -163,12 +163,30 @@
       "label": "New Living Room",
       "token": "3RCOM1s4olSN1x5e9zgDTP_GbhMUwkeo",
       "approvedAt": "2026-05-06T20:39:14.303Z"
+    },
+    "Q9NNUV": {
+      "code": "Q9NNUV",
+      "label": "Living Room Google TV",
+      "paired": true,
+      "token": "AxFBWUB5EGS8htOapDF7ZSnykYZUitT1",
+      "approvedAt": "2026-05-07T17:25:16.728Z"
+    },
+    "T3F7SK": {
+      "code": "T3F7SK",
+      "paired": true,
+      "seenAt": "2026-05-07T17:27:37.658Z",
+      "deviceId": "32d814c9-1917-4cea-9041-3624c9c9fcd1",
+      "name": "Fire TV Receiver",
+      "lastSeenAt": "2026-05-07T17:27:52.639Z",
+      "label": "Living Room Google TV",
+      "token": "bymvrCT-tQ-7tNZ3yP4sLR_tcaLVs-v7",
+      "approvedAt": "2026-05-07T17:27:50.157Z"
     }
   },
   "devices": {
     "8e8032d5-b1b6-4733-8ea5-dc56633f36b2": {
       "id": "8e8032d5-b1b6-4733-8ea5-dc56633f36b2",
-      "label": "New Living Room",
+      "label": "Fire TV",
       "token": "3RCOM1s4olSN1x5e9zgDTP_GbhMUwkeo",
       "delaySeconds": 10,
       "images": [
@@ -252,13 +270,71 @@
           "isVideo": false,
           "delaySeconds": null,
           "createdAt": "2026-05-07T01:51:43.299Z"
+        },
+        {
+          "id": "6e4d5eac-f8d7-4e06-af11-e8ecc7c031dd",
+          "name": "signage-url-1778175207667.mp4",
+          "mime": "video/mp4",
+          "path": "/uploads/6e4d5eac-f8d7-4e06-af11-e8ecc7c031dd.mp4",
+          "isVideo": true,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T17:33:28.286Z"
+        },
+        {
+          "id": "d4126a10-989a-4425-bf57-cf730d1a20c8",
+          "name": "signage-url-1778175217378.mp4",
+          "mime": "video/mp4",
+          "path": "/uploads/d4126a10-989a-4425-bf57-cf730d1a20c8.mp4",
+          "isVideo": true,
+          "delaySeconds": null,
+          "createdAt": "2026-05-07T17:33:37.608Z"
         }
       ],
       "createdAt": "2026-05-06T20:39:16.756Z",
       "name": "ChrisÂ Campos's 5th TV",
-      "lastSeenAt": "2026-05-07T02:11:43.925Z",
+      "lastSeenAt": "2026-05-08T00:54:47.060Z",
+      "activePlaylistId": "8f9062f5-e7a1-454d-b9be-45fe19e8fa73",
+      "liveOverride": {
+        "id": "aa150e5e-277e-4faf-808d-e5b117b288c1",
+        "name": "Family Command Center",
+        "isVideo": false,
+        "isWeb": true,
+        "webUrl": "http://192.168.2.90:8888/command-center.html",
+        "isYouTube": false,
+        "youtubeUrl": null,
+        "delaySeconds": null,
+        "createdAt": "2026-05-08T22:28:20.511Z"
+      },
+      "videos": [],
+      "location": "",
+      "liveOverrideUntil": null,
+      "liveRefreshToken": "1778180612819-0f06b526"
+    },
+    "32d814c9-1917-4cea-9041-3624c9c9fcd1": {
+      "id": "32d814c9-1917-4cea-9041-3624c9c9fcd1",
+      "label": "Living Room Google TV",
+      "token": "bymvrCT-tQ-7tNZ3yP4sLR_tcaLVs-v7",
+      "delaySeconds": 10,
+      "images": [],
+      "createdAt": "2026-05-07T17:27:52.639Z",
+      "name": "Fire TV Receiver",
+      "lastSeenAt": "2026-05-09T10:22:52.137Z",
+      "liveOverride": {
+        "id": "4a788781-fc05-43d7-862f-7b6cd2c5b935",
+        "name": "image-1---561ab0da-bea4-4dfc-8fee-3591cbe1936d.png",
+        "path": "/uploads/7065d8de-7c9b-414a-a8ac-fbe8ec673a1f.png",
+        "isVideo": false,
+        "isWeb": false,
+        "webUrl": null,
+        "isYouTube": false,
+        "youtubeUrl": null,
+        "delaySeconds": null,
+        "createdAt": "2026-05-09T01:47:37.399Z"
+      },
+      "videos": [],
       "activePlaylistId": "bbba1c16-2612-43a3-8518-9f52b4fe8cb7",
-      "liveOverride": null
+      "liveOverrideUntil": null,
+      "liveRefreshToken": "1778251816431-5cf3b469"
     }
   },
   "library": [
@@ -284,15 +360,6 @@
       "addedAt": "2026-05-06T19:26:12.229Z"
     },
     {
-      "id": "8c44eee9-88b3-461f-8e5d-28139a9b0b21",
-      "name": "Fireplace Loop",
-      "type": "video",
-      "tags": [],
-      "path": "/uploads/8c44eee9-88b3-461f-8e5d-28139a9b0b21.mp4",
-      "size": 19322857,
-      "addedAt": "2026-05-06T19:45:20.770Z"
-    },
-    {
       "id": "5a9e3448-ca66-4e4b-8b75-05d4890e5c8b",
       "name": "birds-replacement.mp4",
       "type": "video",
@@ -308,6 +375,98 @@
       "youtubeUrl": "https://www.youtube.com/watch?v=9PhtxqKLvVc",
       "tags": [],
       "addedAt": "2026-05-06T20:22:31.017Z"
+    },
+    {
+      "id": "bd78063a-d340-4db3-91a9-cca4d55aff54",
+      "name": "Fireplace",
+      "type": "video",
+      "tags": [
+        "compressed"
+      ],
+      "path": "/uploads/bd78063a-d340-4db3-91a9-cca4d55aff54.mp4",
+      "size": 10987881,
+      "addedAt": "2026-05-07T17:34:26.709Z"
+    },
+    {
+      "id": "62f55deb-e18e-41b9-a0cc-833616df96c9",
+      "name": "Baby Cam Live",
+      "type": "web",
+      "webUrl": "http://192.168.2.90:1984/stream.html?src=baby_cam&mode=hls,mse,webrtc",
+      "tags": [],
+      "addedAt": "2026-05-07T18:02:45.720Z"
+    },
+    {
+      "id": "9749adf7-6ef9-4d67-9702-865930e81ae1",
+      "name": "Franklin Cam",
+      "type": "wyze",
+      "webUrl": "http://192.168.2.90:1984/stream.html?src=franklin_cam&mode=hls%2Cmse%2Cwebrtc",
+      "wyzeCameraName": "franklin_cam",
+      "wyzeMode": "hls,mse,webrtc",
+      "snapshotUrl": null,
+      "tags": [
+        "wyze-camera"
+      ],
+      "addedAt": "2026-05-07T18:16:45.183Z"
+    },
+    {
+      "id": "46d5bf71-5082-4720-9ddc-ff408ba97939",
+      "name": "Front Door",
+      "type": "wyze",
+      "webUrl": "http://192.168.2.90:1984/stream.html?src=front_doorbell&mode=hls%2Cmse%2Cwebrtc",
+      "wyzeCameraName": "front_doorbell",
+      "wyzeMode": "hls,mse,webrtc",
+      "snapshotUrl": null,
+      "tags": [
+        "wyze-camera"
+      ],
+      "addedAt": "2026-05-07T18:17:39.031Z"
+    },
+    {
+      "id": "5b4a8936-369e-471f-bb66-d12770088225",
+      "name": "Living Room",
+      "type": "wyze",
+      "webUrl": "http://192.168.2.90:1984/stream.html?src=living_room_cam&mode=hls%2Cmse%2Cwebrtc",
+      "wyzeCameraName": "living_room_cam",
+      "wyzeMode": "hls,mse,webrtc",
+      "snapshotUrl": null,
+      "tags": [
+        "wyze-camera"
+      ],
+      "addedAt": "2026-05-07T18:18:27.247Z"
+    },
+    {
+      "id": "72bd229e-eeee-42b5-aa68-9d1dcbe434cd",
+      "name": "4 Cameras Distinct LL",
+      "type": "web",
+      "webUrl": "http://192.168.2.90:3002/multicam.html?cams=baby_cam%2Cliving_room_cam%2Cfranklin_cam%2Cfront_doorbell&bridge=http%3A%2F%2F192.168.2.90%3A1984&mode=mse%2Cwebrtc%2Chls&cols=2&title=Home%204-Cam%20Distinct",
+      "tags": [],
+      "addedAt": "2026-05-07T18:42:43.944Z"
+    },
+    {
+      "id": "994c2c8b-0ee0-4924-9610-73f5efc542ba",
+      "name": "franklin-praise.png",
+      "type": "image",
+      "tags": [],
+      "path": "/uploads/994c2c8b-0ee0-4924-9610-73f5efc542ba.png",
+      "size": 2970370,
+      "addedAt": "2026-05-07T23:13:07.075Z"
+    },
+    {
+      "id": "56081a1e-7192-4be0-a848-54cceca8d375",
+      "name": "Family Command Center",
+      "type": "web",
+      "webUrl": "http://192.168.2.90:8888/command-center.html",
+      "tags": [],
+      "addedAt": "2026-05-08T22:30:38.356Z"
+    },
+    {
+      "id": "7065d8de-7c9b-414a-a8ac-fbe8ec673a1f",
+      "name": "image-1---561ab0da-bea4-4dfc-8fee-3591cbe1936d.png",
+      "type": "image",
+      "tags": [],
+      "path": "/uploads/7065d8de-7c9b-414a-a8ac-fbe8ec673a1f.png",
+      "size": 409920,
+      "addedAt": "2026-05-09T01:47:27.843Z"
     }
   ],
   "playlists": [

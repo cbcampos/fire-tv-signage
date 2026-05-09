@@ -8,6 +8,7 @@ A self-hosted digital signage system for Amazon Fire TV devices. Push images and
 
 - **Push content** (images + videos + YouTube) to Fire TV receivers from a browser admin panel
 - **YouTube streaming** — play YouTube videos directly without downloading; the app streams from YouTube in real-time via a backend proxy
+- **Wyze single-camera streams** — switch the receiver to a single live Wyze camera via Wyze Bridge + go2rtc
 - **Auto-play playlists** — content cycles automatically at a configurable interval
 - **Video support** — MP4, WEBM, MKV, MOV, AVI play full-screen with audio
 - **Offline caching** — receivers cache images locally and keep displaying if the network drops
@@ -131,6 +132,56 @@ fire-tv-signage/
     ├── build.gradle.kts     # Android dependencies (Media3 ExoPlayer + HLS)
     └── gradle.properties    # AndroidX enabled, backend URL configured
 ```
+
+## OpenClaw Skill
+
+For OpenClaw agent operations (deploy, verification, CLI workflows), use:
+
+- `SKILL.md`
+- `OPENCLAW_AGENT_GUIDE.md`
+
+---
+
+## Wyze Camera Integration (Working Setup)
+
+Single-camera Wyze streaming is working with a maintained forked bridge image in host mode.
+
+- **Working image:** `ghcr.io/idisposable/docker-wyze-bridge:latest`
+- **Keep this version only** (the old `mrlt8/wyze-bridge` path is retired for this deployment)
+- **Why this works:** host networking avoids the UDP discovery issues that caused `IOTC_ER_TIMEOUT` for this environment
+
+### Runtime ports on OpenClaw host
+
+- Bridge Web/API: `http://192.168.2.90:5080`
+- go2rtc UI/API: `http://192.168.2.90:1984`
+- RTSP output: `rtsp://192.168.2.90:8554/<camera_name>`
+
+### Recommended launch
+
+```bash
+docker run -d \
+  --name wyze-bridge-alt \
+  --restart unless-stopped \
+  --network host \
+  --env-file ~/.openclaw/.secrets/wyze.env \
+  -e BRIDGE_PORT=5080 \
+  -v ~/.openclaw/wyze-bridge-alt:/config \
+  ghcr.io/idisposable/docker-wyze-bridge:latest
+```
+
+### CLI camera switching commands
+
+```bash
+# List available Wyze cameras from bridge
+node backend/cli.mjs wyze-cams --bridge-url "http://192.168.2.90:5080"
+
+# Push single camera live to a signage device
+node backend/cli.mjs --url "http://192.168.2.90:3002" \
+  push <deviceId> --from-wyze "baby_cam" --wyze-bridge "http://192.168.2.90:1984"
+```
+
+This uses a live web override to:
+`http://<bridge>/stream.html?src=<camera_name>&mode=hls,mse,webrtc`
 
 ---
 
@@ -257,6 +308,21 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 - Verify `yt-dlp` is installed: `yt-dlp --version`
 - Test the stream endpoint: `curl "http://localhost:3002/api/admin/youtube/stream?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ"`
 - Stream URLs expire — they refresh each time the item comes up in the playlist
+- Fire TV builds may require JS challenge support in yt-dlp; this backend uses `--js-runtimes node --remote-components ejs:github`
+
+**Fire TV volume control (ADB):**
+- Some Fire OS builds do not implement direct volume setters (`media volume`, `cmd audio`), so use keyevents only
+- Never run long keyevent loops; use short batches (3-5 key presses), then verify with `dumpsys audio`
+- Read current level:
+  - `adb shell dumpsys audio | sed -n '/STREAM_MUSIC/,/STREAM_ALARM/p' | sed -n '1,20p'`
+- Volume down one step:
+  - `adb shell input keyevent 25`
+- Volume up one step:
+  - `adb shell input keyevent 24`
+- Stable operator pattern:
+  1. Send a small batch (e.g., 4 presses) with short delay (`sleep 0.25`)
+  2. Re-check `STREAM_MUSIC` speaker value
+  3. Repeat until target level is reached
 
 **App won't pair:**
 - Make sure the pairing code shown on TV is entered within 60 seconds

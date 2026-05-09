@@ -88,4 +88,32 @@
 <!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:11:11 -->
 - **Use cases considered:** [score=0.879 recalls=0 avg=0.620 source=memory/2026-04-30.md:11-11]
 <!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:16:16 -->
-- **Status:** Deferred. Don't implement until a concrete use case arises where asking first is actually a blocker. Keep the idea in TOOLS.md. [score=0.873 recalls=0 avg=0.620 source=memory/2026-04-30.md:16-16]
+- **Status:** Deferred. Don't implement until a concrete use case arises where asking first is actually a blocker. Keep the idea in TOOLS.md. [score=0.873 recalls=0 avg=0.620 source=memory/2026-04-30.md:16:16]
+
+## Major Events This Week (2026-05-06 through 2026-05-08)
+
+### Amanda Claire's Job Crisis
+- Lost her job / received formal written warning at work this week
+- HR involvement, needs to write a personal improvement plan
+- Considering resigning from children's ministry at church (told Brandon)
+- Therapist recommended psychiatric evaluation at UAB's Center for Psychiatric Medicine to properly diagnose ADHD/depression/anxiety
+- Amanda's mother gave toxic advice: suggested she leave Chris, "document" things for custody
+- Amanda considering cutting off her mother; baby dedication Sunday may not involve Amanda's parents
+
+### Marriage Support
+- Chris had counseling session (May 8) — therapist validated his role as "peacekeeper" across multiple family systems
+- Chris opened up to his own mother about marital struggles — she responded supportively and offered to help them get away together
+- Next counseling session: June 26th at 10 AM
+- In-laws visiting this weekend for baby dedication (Amanda Claire felt obligated to say yes despite burden)
+
+### Franklin
+- Field Day May 8 — class won final Tug of War; teachers Miss Smitherman and Miss Carpenter
+- Parent-teacher conference: doing very well academically and socially
+- Teacher recommends separating Franklin from Henry/Harley for kindergarten
+- Strong literacy and math; needs practice writing last name
+- School plant needs repotting into larger container
+
+### Work (Jim Pop / UAB)
+- Jim Pop website nearing completion: finalized "Jim Pop Framework" naming, removed NIH-non-compliant language, updated CAB page
+- Moving newsletter to quarterly (was monthly); May newsletter needs review
+- Faculty retreat at Algen coming up (Thursday/Friday)

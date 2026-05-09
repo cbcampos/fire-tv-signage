@@ -235,6 +235,7 @@ function renderWorkspace() {
             </select>
           </label>
           <button type="submit">Push Live</button>
+          <button id="refreshLiveButton" class="secondary" type="button">Refresh Live Output</button>
           <button id="clearOverrideButton" class="secondary" type="button" ${device.liveOverride ? "" : "disabled"}>Clear Override</button>
         </form>
 
@@ -307,6 +308,52 @@ function renderWorkspace() {
             <input id="libraryYoutubeName" placeholder="YouTube Video">
           </label>
           <button type="submit">Add URL</button>
+        </form>
+        <form id="libraryWebForm" class="compact-form">
+          <label>
+            Add web URL to library
+            <input id="libraryWebUrl" placeholder="https://example.com/dashboard" inputmode="url">
+          </label>
+          <label>
+            Name (optional)
+            <input id="libraryWebName" placeholder="Web Dashboard">
+          </label>
+          <button type="submit">Add Web URL</button>
+        </form>
+        <form id="libraryWyzeForm" class="compact-form">
+          <label>
+            Add Wyze camera to library
+            <select id="libraryWyzeCamera"></select>
+          </label>
+          <label>
+            Name (optional)
+            <input id="libraryWyzeName" placeholder="Wyze: baby_cam">
+          </label>
+          <button type="button" id="refreshWyzeCameras">Refresh cameras</button>
+          <button type="submit">Add Camera</button>
+        </form>
+        <form id="libraryMultiCamForm" class="compact-form">
+          <label>
+            Multi-cam cameras
+            <select id="libraryMultiCamCameras" multiple size="5"></select>
+          </label>
+          <label>
+            Layout title
+            <input id="libraryMultiCamTitle" placeholder="Security Office">
+          </label>
+          <label>
+            Library name (optional)
+            <input id="libraryMultiCamName" placeholder="Front + Baby + Driveway">
+          </label>
+          <label>
+            Columns
+            <select id="libraryMultiCamCols">
+              <option value="2" selected>2 columns</option>
+              <option value="3">3 columns</option>
+              <option value="4">4 columns</option>
+            </select>
+          </label>
+          <button type="submit">Create Multi-Cam</button>
         </form>
         <form id="libraryToPlaylistForm" class="compact-form">
           <label>
@@ -514,6 +561,9 @@ function renderPlaylistCards(device) {
 }
 
 function renderPlaylistThumb(item) {
+  if (item.isWeb) {
+    return `<span class="playlist-thumb web-thumb"><iframe class="web-thumb-frame" src="${escapeAttr(item.webUrl || "")}" loading="lazy" referrerpolicy="no-referrer"></iframe><span class="web-thumb-label">WEB</span></span>`;
+  }
   if (item.isYouTube) return `<span class="playlist-thumb text-thumb">YT</span>`;
   if (item.isVideo) return `<video class="playlist-thumb video-thumb-preview" src="${escapeAttr(item.path)}" muted playsinline preload="metadata"></video>`;
   return `<img class="playlist-thumb" src="${escapeAttr(item.path)}" alt="">`;
@@ -548,6 +598,9 @@ function renderLivePreviewHero(device) {
   if (!item) {
     return `<div class="empty-list"><p>No live content.</p></div>`;
   }
+  if (item.isWeb) {
+    return `<div class="asset-preview video-thumb live-hero web-live-hero"><iframe class="web-live-frame" src="${escapeAttr(item.webUrl || "")}" loading="lazy" referrerpolicy="no-referrer"></iframe><span class="video-label">${escapeHtml(item.name || "Web Page")}</span></div>`;
+  }
   if (item.isYouTube) {
     return `<div class="asset-preview video-thumb live-hero"><div class="video-icon">PLAY</div><span class="video-label">${escapeHtml(item.name || "YouTube")}</span></div>`;
   }
@@ -572,11 +625,18 @@ function renderLibraryCards() {
       <div class="playlist-strip">
         ${item.type === "youtube"
           ? `<span class="playlist-thumb text-thumb">YT</span>`
+          : item.type === "web"
+          ? `<span class="playlist-thumb web-thumb"><iframe class="web-thumb-frame" src="${escapeAttr(item.webUrl || "")}" loading="lazy" referrerpolicy="no-referrer"></iframe><span class="web-thumb-label">WEB</span></span>`
+          : item.type === "wyze"
+          ? `<span class="playlist-thumb web-thumb"><iframe class="web-thumb-frame" src="${escapeAttr(item.webUrl || "")}" loading="lazy" referrerpolicy="no-referrer"></iframe><span class="web-thumb-label">CAM</span></span>`
           : item.type === "video"
           ? `<video class="playlist-thumb video-thumb-preview" src="${escapeAttr(item.path)}" muted playsinline preload="metadata"></video>`
           : `<img class="playlist-thumb" src="${escapeAttr(item.path)}" alt="">`}
       </div>
       <div class="playlist-card-actions">
+        <button type="button" class="push-library-live">Push Live</button>
+        <button type="button" class="secondary announce-library-item-30">Announce 30s</button>
+        <button type="button" class="secondary announce-library-item">Announce</button>
         <button type="button" class="secondary add-library-to-playlist">Add</button>
         <button type="button" class="secondary rename-library-item">Rename</button>
         <button type="button" class="danger delete-library-item">Delete</button>
@@ -604,7 +664,7 @@ function renderPlaylistItemManagers() {
             <div class="asset-info-row" data-playlist-item="${escapeAttr(item.id)}">
               <div class="asset-name-col">
                 <strong>${escapeHtml(item.name || "Untitled item")}</strong>
-                <span class="meta">${item.isYouTube ? "YOUTUBE" : item.isVideo ? "VIDEO" : "IMAGE"}</span>
+                <span class="meta">${item.isWeb ? "WEB" : item.isYouTube ? "YOUTUBE" : item.isVideo ? "VIDEO" : "IMAGE"}</span>
               </div>
               <div class="asset-actions">
                 <button type="button" class="danger delete-playlist-item">Remove</button>
@@ -767,6 +827,15 @@ function bindWorkspace(device) {
     });
   });
 
+  document.querySelector("#refreshLiveButton")?.addEventListener("click", async () => {
+    await runAction("Refreshing live output", async () => {
+      await api(`/api/admin/devices/${encodeURIComponent(device.id)}/refresh-live`, {
+        method: "POST"
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
   document.querySelectorAll(".playlist-card").forEach((card) => {
     const playlistId = card.dataset.playlist;
     card.querySelector(".make-live")?.addEventListener("click", async () => {
@@ -830,8 +899,144 @@ function bindWorkspace(device) {
     });
   });
 
+  const libraryWebForm = document.querySelector("#libraryWebForm");
+  libraryWebForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const webUrl = document.querySelector("#libraryWebUrl")?.value?.trim();
+    const name = document.querySelector("#libraryWebName")?.value?.trim();
+    if (!webUrl) { showToast("Enter a web URL."); return; }
+    await runAction("Adding web URL to library", async () => {
+      await api("/api/admin/library/web", {
+        method: "POST",
+        body: { webUrl, name }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  const wyzeCameraSelect = document.querySelector("#libraryWyzeCamera");
+  const multiCamSelect = document.querySelector("#libraryMultiCamCameras");
+  const loadWyzeCameras = async () => {
+    const result = await api("/api/admin/wyze/cameras");
+    const cameras = Array.isArray(result.cameras) ? result.cameras : [];
+    if (wyzeCameraSelect) {
+      if (!cameras.length) {
+        wyzeCameraSelect.innerHTML = `<option value="">No cameras found</option>`;
+        wyzeCameraSelect.disabled = true;
+      } else {
+        wyzeCameraSelect.disabled = false;
+        wyzeCameraSelect.innerHTML = cameras.map((camera) => `
+          <option value="${escapeAttr(camera.name)}">
+            ${escapeHtml(camera.nickname || camera.name)} (${escapeHtml(camera.status || "unknown")})
+          </option>
+        `).join("");
+      }
+    }
+    if (multiCamSelect) {
+      if (!cameras.length) {
+        multiCamSelect.innerHTML = `<option value="">No cameras found</option>`;
+        multiCamSelect.disabled = true;
+      } else {
+        multiCamSelect.disabled = false;
+        multiCamSelect.innerHTML = cameras.map((camera) => `
+          <option value="${escapeAttr(camera.name)}">
+            ${escapeHtml(camera.nickname || camera.name)} (${escapeHtml(camera.status || "unknown")})
+          </option>
+        `).join("");
+      }
+    }
+  };
+
+  const selectedValues = (selectEl) => {
+    if (!selectEl) return [];
+    return Array.from(selectEl.selectedOptions || [])
+      .map((option) => String(option.value || "").trim())
+      .filter(Boolean);
+  };
+
+  const libraryMultiCamForm = document.querySelector("#libraryMultiCamForm");
+  libraryMultiCamForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const cameraNames = selectedValues(document.querySelector("#libraryMultiCamCameras"));
+    const title = document.querySelector("#libraryMultiCamTitle")?.value?.trim();
+    const name = document.querySelector("#libraryMultiCamName")?.value?.trim();
+    const cols = Number(document.querySelector("#libraryMultiCamCols")?.value || 2);
+    if (!cameraNames.length) {
+      showToast("Select at least one camera for the layout.");
+      return;
+    }
+    await runAction("Creating multi-cam layout", async () => {
+      await api("/api/admin/library/multicam", {
+        method: "POST",
+        body: { cameraNames, title, name, cols }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
+  if (wyzeCameraSelect) {
+    loadWyzeCameras().catch((error) => {
+      showToast(error.message);
+    });
+  }
+
+  document.querySelector("#refreshWyzeCameras")?.addEventListener("click", async () => {
+    await runAction("Refreshing Wyze cameras", async () => {
+      await loadWyzeCameras();
+    });
+  });
+
+  const libraryWyzeForm = document.querySelector("#libraryWyzeForm");
+  libraryWyzeForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const cameraName = document.querySelector("#libraryWyzeCamera")?.value?.trim();
+    const name = document.querySelector("#libraryWyzeName")?.value?.trim();
+    if (!cameraName) { showToast("Choose a Wyze camera."); return; }
+    await runAction("Adding Wyze camera to library", async () => {
+      await api("/api/admin/library/wyze", {
+        method: "POST",
+        body: { cameraName, name }
+      });
+      await loadState({ keepStatus: true });
+    });
+  });
+
   document.querySelectorAll("[data-library-item]").forEach((card) => {
     const libraryItemId = card.dataset.libraryItem;
+    card.querySelector(".push-library-live")?.addEventListener("click", async () => {
+      await runAction("Pushing library item live", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/override-library`, {
+          method: "POST",
+          body: { libraryItemId }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
+    card.querySelector(".announce-library-item")?.addEventListener("click", async () => {
+      const raw = window.prompt("Show this item for how many seconds?", "30");
+      if (raw === null) return;
+      const durationSeconds = Number(raw);
+      if (!Number.isFinite(durationSeconds) || durationSeconds < 2) {
+        showToast("Enter a valid duration (>= 2 seconds).");
+        return;
+      }
+      await runAction(`Announcing for ${Math.round(durationSeconds)}s`, async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/override-library-temporary`, {
+          method: "POST",
+          body: { libraryItemId, durationSeconds: Math.round(durationSeconds) }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
+    card.querySelector(".announce-library-item-30")?.addEventListener("click", async () => {
+      await runAction("Announcing for 30s", async () => {
+        await api(`/api/admin/devices/${encodeURIComponent(device.id)}/override-library-temporary`, {
+          method: "POST",
+          body: { libraryItemId, durationSeconds: 30 }
+        });
+        await loadState({ keepStatus: true });
+      });
+    });
     card.querySelector(".rename-library-item")?.addEventListener("click", async () => {
       const currentName = card.querySelector(".playlist-card-head strong")?.textContent?.trim() || "";
       const name = window.prompt("Rename library item:", currentName);

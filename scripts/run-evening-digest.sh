@@ -259,4 +259,4 @@ timeout 30 openclaw message send \
     --channel discord \
     --target "$DISCORD_CHANNEL" \
     --message "$MESSAGE" \
-    2>/dev/null && echo "📤 Delivered to Discord" || echo "⚠️ Discord delivery failed"
+    > /dev/null 2>&1 && echo "📤 Delivered to Discord" || echo "⚠️ Discord delivery failed"

@@ -43,6 +43,10 @@ Primary playbook:
   - `node cli.mjs override-existing <deviceId> --playlist <playlistId> --item <itemId>`
 - Push library item as override:
   - `node cli.mjs override-library <deviceId> <libraryItemId>`
+- Push a single Wyze camera live:
+  - `node cli.mjs push <deviceId> --from-wyze "baby_cam" --wyze-bridge "http://192.168.2.90:1984"`
+- List available Wyze camera names:
+  - `node cli.mjs wyze-cams --bridge-url "http://192.168.2.90:5080"`
 - Unified push-item-live command:
   - `node cli.mjs live-item <deviceId> --library <libraryItemId>`
   - `node cli.mjs live-item <deviceId> --playlist <playlistId> --item <itemId>`
@@ -89,6 +93,7 @@ Primary playbook:
 Notes:
 - Library item types now include `image`, `video`, `youtube`, and `web`.
 - For YouTube/Web library items, `push --from-library` sets a live override on the device (instead of uploading a file).
+- Use `ghcr.io/idisposable/docker-wyze-bridge:latest` in host mode for working Wyze single-camera streaming.
 
 ## Deploy Pattern (OpenClaw)
 
