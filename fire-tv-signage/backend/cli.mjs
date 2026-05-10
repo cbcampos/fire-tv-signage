@@ -964,11 +964,11 @@ function parseOptions(input) {
     const arg = input[i];
     if (arg.startsWith("--")) {
       const eq = arg.indexOf("=");
-      if (eq > 0) {
-        options[arg.slice(2, eq)] = arg.slice(eq + 1);
-      } else {
-        options[arg.slice(2)] = input[++i] ?? true;
-      }
+      const key = eq > 0 ? arg.slice(2, eq) : arg.slice(2);
+      const value = eq > 0 ? arg.slice(eq + 1) : input[++i] ?? true;
+      // Normalize kebab-case to camelCase for options
+      const normalizedKey = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      options[normalizedKey] = value;
     } else {
       positionals.push(arg);
     }
