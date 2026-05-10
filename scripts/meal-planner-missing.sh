@@ -375,6 +375,39 @@ def create_weekly_plan(plan):
     return str(filename)
 
 
+def create_weekly_plan_html(plan):
+    """Save weekly meal plan as HTML for Kitchen Display."""
+    rows = ""
+    for date_str, day_name, meal_name in plan:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        day_short = dt.strftime("%a %m/%d")
+        rows += f'<div class="meal-row"><span class="meal-day">{day_short}</span><span class="meal-name">{meal_name}</span></div>\n'
+    
+    html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body {{ font-family: 'Segoe UI', Arial, sans-serif; background: #2D2A4A; color: white; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; }}
+  .header {{ background: linear-gradient(135deg, #E8613D 0%, #F5A623 100%); padding: 24px 32px; text-align: center; }}
+  .header h1 {{ margin: 0; font-size: 22px; font-weight: 700; }}
+  .header p {{ margin: 4px 0 0; opacity: 0.9; font-size: 13px; }}
+  .meals-bar {{ flex: 1; padding: 20px 28px; overflow-y: auto; }}
+  .meal-row {{ display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 16px; }}
+  .meal-row:last-child {{ border-bottom: none; }}
+  .meal-day {{ font-weight: 700; color: #F5A623; min-width: 80px; }}
+  .meal-name {{ opacity: 0.95; }}
+</style></head><body>
+<div class="header">
+  <h1>🍽️ This Week's Meal Plan</h1>
+  <p>{plan[0][0]} to {plan[-1][0]} &nbsp;•&nbsp; Serves 6</p>
+</div>
+<div class="meals-bar">{rows}</div>
+</body></html>'''
+    html_path = MEALS_DIR / "meal-plan-current.html"
+    html_path.write_text(html)
+    print(f"  ✅ HTML plan saved: {html_path.name}")
+    return str(html_path)
+
+
 # ── Main ────────────────────────────────────────────────────────────
 
 def main():
@@ -428,6 +461,18 @@ def main():
 
     # Save plan
     create_weekly_plan(planned)
+    create_weekly_plan_html(planned)
+    
+    # Push meal plan HTML to Kitchen Display
+    print("Pushing meal plan to Kitchen Display...")
+    html_path = str(MEALS_DIR / "meal-plan-current.html")
+    subprocess.run(["bash", "-c",
+        f"node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs library add '{html_path}' --name 'Meal Plan' 2>&1; "
+        "node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs push 32d814c9-1917-4cea-9041-3624c9c9fcd1 --from-library 'Meal Plan' 2>&1"])
+    
+    # Refresh family calendar dashboard
+    print("Refreshing family dashboard...")
+    subprocess.run(["bash", "-c", "bash ~/.openclaw/workspace/scripts/refresh-family-calendar.sh"])
     
     # Push to Todoist
     print("\nPushing to Todoist...")
@@ -441,7 +486,6 @@ def main():
     send_email(subject, html)
     
     print("\n✅ Done!")
-
 
 if __name__ == "__main__":
     main()

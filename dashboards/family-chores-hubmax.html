@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1">
+<title>Campos Chores</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box }
+:root { --blue:#4A90E2; --fab:#1B6CA8; --text:#333; --muted:#888; --surface:#fff; --line:#E0E8F0; --page:#FAFBFD }
+html { height:100%; overflow:hidden; }
+body { display:flex; flex-direction:row; font-family:'Inter',sans-serif; background:var(--page); color:var(--text); height:100vh; width:100vw; overflow:hidden; position:relative; margin:0; padding:0; }
+
+.sidebar { width:88px; background:#F0F4F8; display:flex; flex-direction:column; align-items:center; padding:20px 0; gap:6px; height:100vh; border-right:1px solid var(--line); flex-shrink:0; }
+.sidebar-logo { font-family:'Playfair Display',serif; font-size:26px; font-weight:700; margin-bottom:16px; cursor:pointer; }
+.nav-item { display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 6px; cursor:pointer; border-radius:10px; width:74px; position:relative; transition:background .15s; }
+.nav-item:hover { background:#E4ECF5 }
+.nav-item.active { background:#DDE9F5 }
+.nav-item.active::before { content:''; position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:60%; background:var(--blue); border-radius:0 3px 3px 0; }
+.nav-item svg { width:22px; height:22px; stroke:#555; fill:none; stroke-width:1.8 }
+.nav-item.active svg { stroke:#4A90E2 }
+.nav-label { font-size:9px; font-weight:500; color:#777; letter-spacing:.3px; text-transform:uppercase }
+.nav-item.active .nav-label { color:#4A90E2 }
+
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; height:100vh; min-width:0; }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 22px 10px; border-bottom:1px solid #F0F0F0; flex-shrink:0; }
+.topbar-date { font-family:'Playfair Display',serif; font-size:24px; font-weight:600; line-height:1.1 }
+.topbar-sub { font-size:13px; color:#999 }
+.topbar-btn { padding:8px 16px; border:1.5px solid #E0E0E0; border-radius:24px; font-size:12px; font-weight:500; color:#555; cursor:pointer }
+.topbar-btn:hover { border-color:#4A90E2; color:#4A90E2 }
+.topbar-btn.today { background:#4A90E2; color:#fff; border-color:#4A90E2 }
+
+.cards-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; padding:18px 22px; flex:1; overflow:hidden; align-items:start; }
+.member-card { background:var(--surface); border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.07); padding:18px; display:flex; flex-direction:column; gap:14px; max-height:680px; overflow:hidden; }
+.card-header { display:flex; align-items:center; gap:12px }
+.avatar { width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#fff; flex-shrink:0; }
+.card-info { flex:1; min-width:0 }
+.card-name { font-family:'Playfair Display',serif; font-size:17px; font-weight:600; margin-bottom:6px }
+.progress-track { height:6px; background:#EDF2F7; border-radius:99px; overflow:hidden; margin-bottom:4px }
+.progress-fill { height:100%; border-radius:99px; transition:width .4s ease }
+.progress-label { font-size:10px; color:#999; font-weight:500 }
+.card-tabs { display:flex; gap:6px }
+.tab-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 4px; border-radius:12px; cursor:pointer; border:1.5px solid transparent; background:#F5F7FA; transition:all .15s; }
+.tab-btn.active { background:var(--card-light); border-color:var(--card-color) }
+.tab-icon { font-size:16px }
+.tab-label { font-size:9px; font-weight:600; color:#999; letter-spacing:.3px; text-transform:uppercase }
+.tab-btn.active .tab-label { color:var(--card-color) }
+.card-tasks { display:flex; flex-direction:column; gap:6px; overflow-y:auto; max-height:420px; scrollbar-width:none; }
+.card-tasks::-webkit-scrollbar { display:none }
+.tab-content { display:none; flex-direction:column; gap:6px }
+.tab-content.active { display:flex }
+.task-row { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:14px; background:#F7F9FC; cursor:pointer; transition:all .15s; border:1.5px solid transparent }
+.task-row:hover { background:#EEF2F8 }
+.task-row.checked { background:var(--card-light); border-color:var(--card-color); opacity:.7 }
+.task-row.checked .task-name { text-decoration:line-through; color:#999 }
+.task-text { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0 }
+.task-name { font-size:13px; font-weight:500 }
+.late-tag { font-size:10px; color:#D0021B; font-weight:500 }
+.task-check { width:22px; height:22px; border-radius:50%; border:2px solid #ccd; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:all .15s }
+.task-row.checked .task-check { background:var(--card-color); border-color:var(--card-color) }
+.empty-tab { text-align:center; padding:20px; color:#aaa; font-size:12px }
+.fab { position:fixed; bottom:28px; right:28px; width:52px; height:52px; background:var(--fab); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 16px rgba(26,108,168,.35); color:#fff; font-size:26px; font-weight:300; z-index:100; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">✨</div>
+  <div class="nav-item" onclick="window.location.href='https://fern-pepper-bre5.here.now/'">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span class="nav-label">Calendar</span>
+  </div>
+  <div class="nav-item active" onclick="location.href='family-chores-hubmax.html'">
+    <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    <span class="nav-label">Chores</span>
+  </div>
+  <div class="nav-item" onclick="window.location.href='https://aware-essence-vhxy.here.now/'">
+    <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+    <span class="nav-label">Meals</span>
+  </div>
+  <div class="nav-item" onclick="window.location.href='https://fern-pepper-bre5.here.now/'">
+    <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+    <span class="nav-label">Sleep</span>
+  </div>
+  <div class="nav-item" onclick="window.location.href='https://fern-pepper-bre5.here.now/'">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    <span class="nav-label">Settings</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="topbar-date" id="topbar-date"></div>
+      <div class="topbar-sub">Campos Family Chores</div>
+    </div>
+    <div class="topbar-btn" onclick="location.reload()">↻ Sync</div>
+  </div>
+  <div class="cards-grid">
+        <div class="member-card" style="--card-color:#4A90D9; --card-light:#EBF3FF;">
+            <div class="card-header">
+                <div class="avatar" style="background:#4A90D9">D</div>
+                <div class="card-info">
+                    <div class="card-name">Dad</div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:0%;background:#4A90D9"></div>
+                    </div>
+                    <span class="progress-label">✓ 0/0</span>
+                </div>
+            </div>
+            <div class="card-tabs"><div class="tab-btn active" onclick="showTab('dad','Morning',this)"><div class="tab-icon">☀️</div><div class="tab-label">Morning</div></div><div class="tab-btn" onclick="showTab('dad','Evening',this)"><div class="tab-icon">🌙</div><div class="tab-label">Evening</div></div><div class="tab-btn" onclick="showTab('dad','Chores',this)"><div class="tab-icon">🧹</div><div class="tab-label">Chores</div></div></div>
+            <div class="card-tasks"><div class="tab-content active" data-tab="dad-Morning"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="dad-Evening"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="dad-Chores"><div class="empty-tab">No tasks</div></div></div>
+        </div>
+        <div class="member-card" style="--card-color:#E8A87C; --card-light:#FFF2ED;">
+            <div class="card-header">
+                <div class="avatar" style="background:#E8A87C">M</div>
+                <div class="card-info">
+                    <div class="card-name">Mom</div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:0%;background:#E8A87C"></div>
+                    </div>
+                    <span class="progress-label">✓ 0/0</span>
+                </div>
+            </div>
+            <div class="card-tabs"><div class="tab-btn active" onclick="showTab('mom','Morning',this)"><div class="tab-icon">☀️</div><div class="tab-label">Morning</div></div><div class="tab-btn" onclick="showTab('mom','Evening',this)"><div class="tab-icon">🌙</div><div class="tab-label">Evening</div></div><div class="tab-btn" onclick="showTab('mom','Chores',this)"><div class="tab-icon">🧹</div><div class="tab-label">Chores</div></div></div>
+            <div class="card-tasks"><div class="tab-content active" data-tab="mom-Morning"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="mom-Evening"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="mom-Chores"><div class="empty-tab">No tasks</div></div></div>
+        </div>
+        <div class="member-card" style="--card-color:#9B72E8; --card-light:#EDE9FE;">
+            <div class="card-header">
+                <div class="avatar" style="background:#9B72E8">F</div>
+                <div class="card-info">
+                    <div class="card-name">Franklin</div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:0%;background:#9B72E8"></div>
+                    </div>
+                    <span class="progress-label">✓ 0/2</span>
+                </div>
+            </div>
+            <div class="card-tabs"><div class="tab-btn active" onclick="showTab('franklin','Morning',this)"><div class="tab-icon">☀️</div><div class="tab-label">Morning</div></div><div class="tab-btn" onclick="showTab('franklin','Evening',this)"><div class="tab-icon">🌙</div><div class="tab-label">Evening</div></div><div class="tab-btn" onclick="showTab('franklin','Chores',this)"><div class="tab-icon">🧹</div><div class="tab-label">Chores</div></div></div>
+            <div class="card-tasks"><div class="tab-content active" data-tab="franklin-Morning"><div class="task-row" data-id="6gWJ8P5Q8CxhP4fj" onclick="toggleTask(this)"><div class="task-text"><span class="task-name">Put on clothes</span><span class="late-tag">Anytime</span></div><div class="task-check"></div></div><div class="task-row" data-id="6gWJ8PwGhC6WpXjC" onclick="toggleTask(this)"><div class="task-text"><span class="task-name">Eat breakfast</span><span class="late-tag">Anytime</span></div><div class="task-check"></div></div></div><div class="tab-content" data-tab="franklin-Evening"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="franklin-Chores"><div class="empty-tab">No tasks</div></div></div>
+        </div>
+        <div class="member-card" style="--card-color:#E879A9; --card-light:#FCE7F3;">
+            <div class="card-header">
+                <div class="avatar" style="background:#E879A9">M</div>
+                <div class="card-info">
+                    <div class="card-name">Mae</div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width:0%;background:#E879A9"></div>
+                    </div>
+                    <span class="progress-label">✓ 0/0</span>
+                </div>
+            </div>
+            <div class="card-tabs"><div class="tab-btn active" onclick="showTab('mae','Morning',this)"><div class="tab-icon">☀️</div><div class="tab-label">Morning</div></div><div class="tab-btn" onclick="showTab('mae','Evening',this)"><div class="tab-icon">🌙</div><div class="tab-label">Evening</div></div><div class="tab-btn" onclick="showTab('mae','Chores',this)"><div class="tab-icon">🧹</div><div class="tab-label">Chores</div></div></div>
+            <div class="card-tasks"><div class="tab-content active" data-tab="mae-Morning"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="mae-Evening"><div class="empty-tab">No tasks</div></div><div class="tab-content" data-tab="mae-Chores"><div class="empty-tab">No tasks</div></div></div>
+        </div></div>
+</div>
+
+<div class="fab">+</div>
+
+<script>
+function updateClock() {
+  document.getElementById('topbar-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}).toUpperCase();
+}
+updateClock(); setInterval(updateClock, 30000);
+
+function showTab(member, tab, btn) {
+  document.querySelectorAll('[data-tab]').forEach(el => {
+    if (el.dataset.tab && el.dataset.tab.startsWith(member)) el.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.closest('.member-card') === btn.closest('.member-card')) b.classList.remove('active');
+  });
+  document.querySelector('[data-tab="' + member + '-' + tab + '"]').classList.add('active');
+  btn.classList.add('active');
+}
+
+function toggleTask(el) {
+  el.classList.toggle('checked');
+  const id = el.dataset.id;
+  let done = JSON.parse(localStorage.getItem('chores_done') || '{}');
+  done[id] = !done[id];
+  localStorage.setItem('chores_done', JSON.stringify(done));
+  updateAllProgress();
+}
+
+function updateAllProgress() {
+  document.querySelectorAll('.member-card').forEach(card => {
+    const total = card.querySelectorAll('.task-row').length;
+    const done = card.querySelectorAll('.task-row.checked').length;
+    const pct = total ? Math.round(100*done/total) : 0;
+    const fill = card.querySelector('.progress-fill');
+    const label = card.querySelector('.progress-label');
+    if (fill) fill.style.width = pct+'%';
+    if (label) label.textContent = '✓ ' + done + '/' + total;
+  });
+}
+
+function restoreState() {
+  const done = JSON.parse(localStorage.getItem('chores_done') || '{}');
+  Object.entries(done).forEach(([id, isDone]) => {
+    const el = document.querySelector('[data-id="' + id + '"]');
+    if (el && isDone) el.classList.add('checked');
+  });
+  updateAllProgress();
+}
+restoreState();
+</script>
+</body>
+</html>
