@@ -13,7 +13,7 @@ const DB_PATH = path.join(DATA_DIR, "db.json");
 const PORT = Number(process.env.PORT || 3002);
 const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "";
-const YTDLP_BIN = process.env.YTDLP_BIN || "yt-dlp";
+const YTDLP_BIN = process.env.YTDLP_BIN || "/home/ccampos/.openclaw/workspace/scripts/yt-dlp-wrap.sh";
 const WYZE_BRIDGE_URL = process.env.WYZE_BRIDGE_URL || "http://192.168.2.90:1984";
 const WYZE_BRIDGE_API_URL = process.env.WYZE_BRIDGE_API_URL || WYZE_BRIDGE_URL.replace(/:1984$/, ":5080");
 
@@ -53,6 +53,9 @@ server.listen(PORT, HOST, () => {
   console.log(`Signage backend listening on http://${HOST}:${PORT}`);
   console.log(`Runtime data: ${DATA_DIR}`);
 });
+
+setInterval(processDueSchedules, 60 * 1000);
+processDueSchedules();
 
 async function routeApi(req, res, url) {
   const parts = url.pathname.split("/").filter(Boolean);
@@ -136,6 +139,55 @@ async function routeApi(req, res, url) {
 
   if (req.method === "GET" && parts[1] === "admin" && parts[2] === "state") {
     sendJson(res, 200, adminState(req));
+    return;
+  }
+
+  if (req.method === "GET" && parts[1] === "admin" && parts[2] === "schedules" && !parts[3]) {
+    sendJson(res, 200, { schedules: listSchedules() });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "schedules" && !parts[3]) {
+    const body = await readJson(req);
+    const libraryItem = db.library.find((entry) => entry.id === body.libraryItemId);
+    if (!libraryItem) { sendJson(res, 404, { error: "Library item not found." }); return; }
+    const deviceId = body.deviceId ? String(body.deviceId) : null;
+    if (deviceId && !db.devices[deviceId]) { sendJson(res, 404, { error: "Device not found." }); return; }
+    const runAt = new Date(String(body.runAt || ""));
+    if (!Number.isFinite(runAt.getTime())) { sendJson(res, 400, { error: "runAt must be a valid ISO timestamp." }); return; }
+    const repeatType = normalizeRepeatType(body.repeatType);
+    if (!repeatType) { sendJson(res, 400, { error: "repeatType must be once, daily, or weekly." }); return; }
+    const schedule = {
+      id: crypto.randomUUID(),
+      libraryItemId: libraryItem.id,
+      deviceId,
+      runAt: runAt.toISOString(),
+      repeatType,
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    db.schedules.push(schedule);
+    saveDb();
+    sendJson(res, 200, { ok: true, schedule: decorateSchedule(schedule) });
+    return;
+  }
+
+  if (req.method === "DELETE" && parts[1] === "admin" && parts[2] === "schedules" && parts[3] && !parts[4]) {
+    const idx = db.schedules.findIndex((schedule) => schedule.id === parts[3]);
+    if (idx === -1) { sendJson(res, 404, { error: "Schedule not found." }); return; }
+    db.schedules.splice(idx, 1);
+    saveDb();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "POST" && parts[1] === "admin" && parts[2] === "schedules" && parts[3] && parts[4] === "toggle") {
+    const schedule = db.schedules.find((entry) => entry.id === parts[3]);
+    if (!schedule) { sendJson(res, 404, { error: "Schedule not found." }); return; }
+    const body = await readJson(req).catch(() => ({}));
+    schedule.active = body.active === undefined ? !schedule.active : Boolean(body.active);
+    saveDb();
+    sendJson(res, 200, { ok: true, schedule: decorateSchedule(schedule) });
     return;
   }
 
@@ -905,8 +957,90 @@ function adminState(req) {
     devices: Object.values(db.devices)
       .sort((a, b) => String(b.lastSeenAt).localeCompare(String(a.lastSeenAt))),
     library: db.library,
-    playlists: db.playlists
+    playlists: db.playlists,
+    schedules: listSchedules()
   };
+}
+
+function listSchedules() {
+  return db.schedules.map(decorateSchedule)
+    .sort((a, b) => String(a.runAt).localeCompare(String(b.runAt)));
+}
+
+function decorateSchedule(schedule) {
+  const libraryItem = db.library.find((entry) => entry.id === schedule.libraryItemId);
+  const device = schedule.deviceId ? db.devices[schedule.deviceId] : null;
+  return {
+    ...schedule,
+    libraryItemName: libraryItem?.name || "Missing library item",
+    libraryItemType: libraryItem?.type || null,
+    deviceName: schedule.deviceId ? (device?.label || schedule.deviceId) : "All displays"
+  };
+}
+
+function normalizeRepeatType(value) {
+  const repeatType = String(value || "once").toLowerCase();
+  return ["once", "daily", "weekly"].includes(repeatType) ? repeatType : null;
+}
+
+function libraryItemToLiveOverride(libraryItem) {
+  return {
+    id: crypto.randomUUID(),
+    name: libraryItem.name,
+    path: libraryItem.path,
+    isVideo: libraryItem.type === "video",
+    isWeb: libraryItem.type === "web" || libraryItem.type === "wyze",
+    webUrl: libraryItem.webUrl || null,
+    isYouTube: libraryItem.type === "youtube",
+    youtubeUrl: libraryItem.youtubeUrl || null,
+    delaySeconds: null,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function applyLibraryOverride(device, libraryItem) {
+  device.liveOverride = libraryItemToLiveOverride(libraryItem);
+  device.liveOverrideUntil = null;
+  device.liveRefreshToken = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function advanceRunAt(runAt, repeatType, now) {
+  const next = new Date(runAt);
+  const stepDays = repeatType === "weekly" ? 7 : 1;
+  do {
+    next.setUTCDate(next.getUTCDate() + stepDays);
+  } while (next.getTime() <= now.getTime());
+  return next.toISOString();
+}
+
+function processDueSchedules() {
+  const now = new Date();
+  let changed = false;
+  for (const schedule of db.schedules || []) {
+    if (!schedule.active) continue;
+    const runAt = new Date(schedule.runAt);
+    if (!Number.isFinite(runAt.getTime()) || runAt.getTime() > now.getTime()) continue;
+    const libraryItem = db.library.find((entry) => entry.id === schedule.libraryItemId);
+    if (!libraryItem) {
+      schedule.active = false;
+      changed = true;
+      continue;
+    }
+    const targetDevices = schedule.deviceId
+      ? [db.devices[schedule.deviceId]].filter(Boolean)
+      : Object.values(db.devices);
+    for (const device of targetDevices) {
+      applyLibraryOverride(device, libraryItem);
+    }
+    if (schedule.repeatType === "once") {
+      schedule.active = false;
+    } else {
+      schedule.runAt = advanceRunAt(schedule.runAt, schedule.repeatType, now);
+    }
+    schedule.lastTriggeredAt = now.toISOString();
+    changed = true;
+  }
+  if (changed) saveDb();
 }
 
 function saveDataUrlImage(name, dataUrl) {
@@ -941,6 +1075,7 @@ function loadDb() {
     if (!data.devices || typeof data.devices !== "object") data.devices = {};
     if (!data.library) data.library = [];
     if (!data.playlists) data.playlists = [];
+    if (!Array.isArray(data.schedules)) data.schedules = [];
     for (const device of Object.values(data.devices)) {
       if (!Array.isArray(device.images)) device.images = [];
       if (!Array.isArray(device.videos)) device.videos = [];
@@ -952,9 +1087,14 @@ function loadDb() {
     for (const playlist of data.playlists) {
       if (!Array.isArray(playlist.items)) playlist.items = [];
     }
+    for (const schedule of data.schedules) {
+      schedule.deviceId = schedule.deviceId || null;
+      schedule.repeatType = normalizeRepeatType(schedule.repeatType) || "once";
+      schedule.active = schedule.active !== false;
+    }
     return data;
   } catch {
-    return { pairingCodes: {}, devices: {}, library: [], playlists: [] };
+    return { pairingCodes: {}, devices: {}, library: [], playlists: [], schedules: [] };
   }
 }
 

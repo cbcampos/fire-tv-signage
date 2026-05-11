@@ -273,9 +273,19 @@ function renderLibraryCards() {
   return state.library.map((item) => `
     <article class="media-card" data-library-item="${escapeAttr(item.id)}">
       <div class="media-preview">${renderPreview(item)}</div>
-      <div>
-        <strong>${escapeHtml(item.name)}</strong>
-        <p class="meta">${escapeHtml(String(item.type || 'image').toUpperCase())}</p>
+      <div class="media-card-head">
+        <div>
+          <strong>${escapeHtml(item.name)}</strong>
+          <p class="meta">${escapeHtml(String(item.type || 'image').toUpperCase())}</p>
+        </div>
+        <button
+          type="button"
+          class="icon-button danger"
+          data-library-delete="${escapeAttr(item.id)}"
+          data-library-name="${escapeAttr(item.name)}"
+          aria-label="Delete ${escapeAttr(item.name)}"
+          title="Delete ${escapeAttr(item.name)}"
+        >Del</button>
       </div>
       <label>Playlist target
         <select data-library-target="${escapeAttr(item.id)}">
@@ -287,7 +297,6 @@ function renderLibraryCards() {
         <button type="button" class="secondary" data-library-announce="${escapeAttr(item.id)}">Announce</button>
         <button type="button" class="secondary" data-library-announce-temp="${escapeAttr(item.id)}">30s live</button>
         <button type="button" class="secondary" data-library-add="${escapeAttr(item.id)}" ${(state.playlists || []).length ? '' : 'disabled'}>Add to playlist</button>
-        <button type="button" class="danger" data-library-delete="${escapeAttr(item.id)}">Delete</button>
       </div>
     </article>
   `).join('');
@@ -498,7 +507,8 @@ function bindWorkspace(device) {
 
   document.querySelectorAll('[data-library-delete]').forEach((button) => {
     button.addEventListener('click', async () => {
-      if (!window.confirm('Delete this library item?')) return;
+      const itemName = button.dataset.libraryName || 'this library item';
+      if (!window.confirm(`Delete ${itemName}?`)) return;
       await runAction('Deleting library item', async () => {
         await api(`/api/admin/library/${encodeURIComponent(button.dataset.libraryDelete)}`, { method: 'DELETE' });
         await loadState({ keepStatus: true });

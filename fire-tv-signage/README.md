@@ -6,10 +6,12 @@ A self-hosted digital signage system for Amazon Fire TV devices. Push images and
 
 ## What it does
 
-- **Push content** (images + videos + YouTube) to Fire TV receivers from a browser admin panel
+- **Push content** (images + videos + YouTube + web views) to Fire TV receivers from a browser admin panel
 - **YouTube streaming** — play YouTube videos directly without downloading; the app streams from YouTube in real-time via a backend proxy
+- **v2 backend UI** — mobile-first control room at `/v2` for fast live pushes, playlist ops, display management, and schedules
 - **Wyze single-camera streams** — switch the receiver to a single live Wyze camera via Wyze Bridge + go2rtc
 - **Auto-play playlists** — content cycles automatically at a configurable interval
+- **Scheduled pushes** — queue a library item once, daily, or weekly for one display or all displays
 - **Video support** — MP4, WEBM, MKV, MOV, AVI play full-screen with audio
 - **Offline caching** — receivers cache images locally and keep displaying if the network drops
 - **Wake lock** — Fire TV won't sleep while the app is running
@@ -34,7 +36,8 @@ Browser (Admin UI)              Fire TV (Receiver App)
 **Components:**
 - **Backend** — Node.js web server (port 3002) serving the admin UI + a REST API for receiver pairing, content management, YouTube stream proxy, and playlist delivery
 - **Receiver APK** — Android app installed on Fire TV; polls the backend every 5 seconds for playlist changes and displays content full-screen
-- **Admin UI** — single-page web app served by the backend at `http://<server>:3002`
+- **Admin UI** — classic single-page web app served by the backend at `http://<server>:3002`
+- **Admin UI v2** — control-room UI served at `http://<server>:3002/v2`
 
 ### YouTube Streaming How It Works
 
@@ -69,7 +72,10 @@ npm install
 node server.mjs
 ```
 
-The server runs on **port 3002** by default. Access the admin UI at `http://<your-server-ip>:3002`.
+The server runs on **port 3002** by default.
+
+- Classic admin UI: `http://<your-server-ip>:3002`
+- v2 backend UI: `http://<your-server-ip>:3002/v2`
 
 ### 2. Set environment variables (optional)
 
@@ -99,6 +105,36 @@ PUBLIC_BASE_URL=https://... # if behind a reverse proxy
 1. Open the app on the Fire TV — it will show a 6-character pairing code
 2. Go to `http://<server-ip>:3002` on a browser
 3. Enter the pairing code to link the device to the admin panel
+
+## Backend UI v2
+
+The v2 UI is the faster operator surface for phones, tablets, and quick remote control.
+
+**Route:** `GET /v2`
+
+### What v2 is good at
+
+- Push any library item live to a selected display without leaving the library tab
+- Flip the target display from the library header with **Push to** + **Swap**
+- Add files, YouTube URLs, and web pages into the shared library
+- Rename or delete library items inline
+- Send a library item live for **30 seconds** or indefinitely
+- Create playlists and add library items into them
+- Manage paired displays, live overrides, delay seconds, labels, and locations
+- Create schedules for a library item:
+  - one-time
+  - daily
+  - weekly
+  - target one display or all displays
+- Toggle schedules on/off and delete them
+
+### v2 tabs
+
+- **Library** — shared media, quick live push controls, upload forms
+- **Playlists** — create playlists, inspect contents, send playlists live
+- **Displays** — live preview, selected-display details, override clearing
+- **Schedule** — scheduled pushes backed by `/api/admin/schedules`
+- **Settings** — backend status and selected display defaults
 
 ### 5. Add content
 
@@ -191,7 +227,7 @@ This uses a live web override to:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/admin/state` | Full admin state: devices, pending pairings, library |
+| `GET` | `/api/admin/state` | Full admin state: devices, pending pairings, library, playlists, schedules |
 | `POST` | `/api/admin/pair` | Approve a pending pairing code |
 | `PATCH` | `/api/admin/devices/:id` | Update device label, location, or delaySeconds |
 
@@ -203,6 +239,15 @@ This uses a live web override to:
 | `POST` | `/api/admin/devices/:id/youtube` | Add YouTube video URL to device playlist |
 | `DELETE` | `/api/admin/devices/:id/images/:imgId` | Remove image from playlist |
 | `DELETE` | `/api/admin/devices/:id/youtube/:vidId` | Remove YouTube video from playlist |
+
+### Schedules
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/schedules` | List saved schedules |
+| `POST` | `/api/admin/schedules` | Create a schedule for a library item |
+| `POST` | `/api/admin/schedules/:id/toggle` | Enable/disable a schedule |
+| `DELETE` | `/api/admin/schedules/:id` | Delete a schedule |
 
 ### Receiver App API
 
