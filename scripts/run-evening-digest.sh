@@ -1,5 +1,5 @@
 #!/bin/bash
-# Evening Digest - Tomorrow's prep + Bee voice notes from today only
+# Evening Digest - Tomorrow's prep + Bee journals/todos split cleanly
 # Run: 7pm weekdays
 # Sources: Google Calendar (all 3) + Bee journals/todos from today only
 
@@ -216,14 +216,20 @@ fi
 # Build Bee block
 BEE_BLOCK=""
 if [ -n "$BEE_JOURNALS_TODAY" ] || [ -n "$BEE_OPEN_TODOS" ]; then
-    BEE_BLOCK="**🗒️ BEE VOICE NOTES (TODAY)**"$'\n'
-    [ -n "$BEE_JOURNALS_TODAY" ] && BEE_BLOCK+="  📌 ${BEE_JOURNALS_TODAY}"$'\n'
+    if [ -n "$BEE_JOURNALS_TODAY" ]; then
+        BEE_BLOCK+="**📝 BEE JOURNALS / VOICE NOTES (TODAY)**"$'\n'
+        while IFS= read -r journal; do
+            [ -n "$journal" ] && BEE_BLOCK+="  📌 ${journal}"$'\n'
+        done <<< "$BEE_JOURNALS_TODAY"
+        BEE_BLOCK+=$'\n'
+    fi
     if [ -n "$BEE_OPEN_TODOS" ]; then
+        BEE_BLOCK+="**✅ BEE TODOS (OPEN)**"$'\n'
         while IFS= read -r todo; do
             [ -n "$todo" ] && BEE_BLOCK+="  ⏳ ${todo}"$'\n'
         done <<< "$BEE_OPEN_TODOS"
+        BEE_BLOCK+=$'\n'
     fi
-    BEE_BLOCK+=$'\n'
 fi
 
 # ── Save to memory ──────────────────────────────────────────────────────────
@@ -234,10 +240,16 @@ OUTPUT_FILE=~/.openclaw/workspace/memory/nightly_reviews/evening-${TODAY_DATE}.m
     echo "## Tomorrow ($TOMORROW)"
     echo "$WEATHER"
     echo ""
-    echo "## Bee Voice Notes (Today)"
-    [ -n "$BEE_JOURNALS_TODAY" ] && echo "  📌 $BEE_JOURNALS_TODAY"
-    [ -n "$BEE_OPEN_TODOS" ] && echo "$BEE_OPEN_TODOS" | while IFS= read -r t; do [ -n "$t" ] && echo "  ⏳ $t"; done
-    echo ""
+    if [ -n "$BEE_JOURNALS_TODAY" ]; then
+        echo "## Bee Journals / Voice Notes (Today)"
+        while IFS= read -r j; do [ -n "$j" ] && echo "  📌 $j"; done <<< "$BEE_JOURNALS_TODAY"
+        echo ""
+    fi
+    if [ -n "$BEE_OPEN_TODOS" ]; then
+        echo "## Bee Todos (Open)"
+        while IFS= read -r t; do [ -n "$t" ] && echo "  ⏳ $t"; done <<< "$BEE_OPEN_TODOS"
+        echo ""
+    fi
     echo "## Calendar"
     echo "$FAM_CAL"
     echo "$WRK_CAL"
