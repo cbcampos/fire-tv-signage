@@ -96,7 +96,7 @@
 - Lost her job / received formal written warning at work this week
 - HR involvement, needs to write a personal improvement plan
 - Considering resigning from children's ministry at church (told Brandon)
-- Therapist recommended psychiatric evaluation at UAB's Center for Psychiatric Medicine to properly diagnose ADHD/depression/anxiety
+- Therapist recommended psychiatric evaluation at UAB's Center for Psychiatric Medicine — her current anxiety/depression medication is not working and she needs a medication adjustment/reevaluation. Rash is a secondary, minor issue.
 - Amanda's mother gave toxic advice: suggested she leave Chris, "document" things for custody
 - Amanda considering cutting off her mother; baby dedication Sunday may not involve Amanda's parents
 
@@ -117,3 +117,10 @@
 - Jim Pop website nearing completion: finalized "Jim Pop Framework" naming, removed NIH-non-compliant language, updated CAB page
 - Moving newsletter to quarterly (was monthly); May newsletter needs review
 - Faculty retreat at Algen coming up (Thursday/Friday)
+
+## Promoted From Short-Term Memory (2026-05-10)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-03-04.md:16:19 -->
+- **Summary:** - 📅 **Wed March 4** — Franklin has "Wacky Outfit or Wacky Hair Day" at school, plus full work day (Campus Communicators meeting 8-5, Forge AHEAD meeting at 10am, FAC Team at 11am), pickup at 2pm, Home Group at 6pm [score=0.881 recalls=3 avg=0.910 source=memory/2026-03-04.md:16-17]
+<!-- openclaw-memory-promotion:memory:memory/2026-04-23.md:11:14 -->
+- - Father-son return hike to complete overlook trail - Improving follow-through and quick repairs in relationships - ⚠️ October commitments were made but not fulfilled — pattern flag - Department history presentation — first version due **Saturday** [score=0.872 recalls=1 avg=0.672 source=memory/2026-04-23.md:11-14]
