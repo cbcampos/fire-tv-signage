@@ -112,6 +112,16 @@ cal_ids = {
 }
 work_offsets = {'Family': 0, 'Personal': 0, 'Work': -6}
 
+
+def extract_error(stderr, stdout):
+    text = (stderr or stdout or '').strip()
+    if not text:
+        return 'unknown gws error'
+    if 'invalid_grant' in text or 'expired or revoked' in text:
+        return 'gws auth expired'
+    return text.splitlines()[-1][:160]
+
+
 for name, cal_id in cal_ids.items():
     params = json.dumps({
         'calendarId': cal_id,
@@ -124,35 +134,37 @@ for name, cal_id in cal_ids.items():
         ['gws', 'calendar', 'events', 'list', '--params', params],
         capture_output=True, text=True
     )
-    try:
-        data = json.loads(r.stdout)
-        events = []
-        for e in data.get('items', []):
-            start = e.get('start', {})
-            date_val = start.get('date', '')
-            dt_val = start.get('dateTime', '')
-            if date_val:
-                # All-day event
-                events.append('ALL DAY: ' + e.get('summary', 'No title'))
-            elif dt_val:
-                # Filter recurring events: only show if originalStartTime falls on target date
-                orig = e.get('originalStartTime', {})
-                orig_val = orig.get('dateTime', '')
-                target_date = '$TOMORROW_ISO'[:10]
-                if orig_val and orig_val[:10] != target_date:
-                    continue  # Skip recurring events from adjacent days
-                dt = datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
-                dt += timedelta(hours=work_offsets[name])
-                time_str = 'ALL DAY' if dt.hour == 0 and dt.minute == 0 else dt.strftime('%-I:%M %p')
-                events.append(time_str + ': ' + e.get('summary', 'No title'))
-        result = sorted(events) if events else ['No events']
-    except:
-        result = ['No events']
+
+    if r.returncode != 0:
+        result = ['ERROR: ' + extract_error(r.stderr, r.stdout)]
+    else:
+        try:
+            data = json.loads(r.stdout)
+            events = []
+            for e in data.get('items', []):
+                start = e.get('start', {})
+                date_val = start.get('date', '')
+                dt_val = start.get('dateTime', '')
+                if date_val:
+                    events.append('ALL DAY: ' + e.get('summary', 'No title'))
+                elif dt_val:
+                    orig = e.get('originalStartTime', {})
+                    orig_val = orig.get('dateTime', '')
+                    target_date = '$TOMORROW_ISO'[:10]
+                    if orig_val and orig_val[:10] != target_date:
+                        continue
+                    dt = datetime.fromisoformat(dt_val.replace('Z', '+00:00'))
+                    dt += timedelta(hours=work_offsets[name])
+                    time_str = 'ALL DAY' if dt.hour == 0 and dt.minute == 0 else dt.strftime('%-I:%M %p')
+                    events.append(time_str + ': ' + e.get('summary', 'No title'))
+            result = sorted(events) if events else ['No events']
+        except Exception:
+            result = ['ERROR: failed to parse gws calendar response']
 
     print('CAL:' + name)
     for e in result:
         print(' ' + e)
-" 2>/dev/null)
+")
 
 # ── Extract sections with Python — avoids shell subshell bugs ─────────────────
 CAL_PARSED=$(echo "$CAL_RAW" | python3 -c "
