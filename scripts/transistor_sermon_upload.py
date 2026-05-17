@@ -101,6 +101,8 @@ def main():
     parser.add_argument("--number", type=int)
     parser.add_argument("--episode-type", default="full", choices=["full", "trailer", "bonus"])
     parser.add_argument("--transcript-file")
+    parser.add_argument("--episode-id", help="Existing Transistor episode id to update/publish")
+    parser.add_argument("--publish", action="store_true", help="Publish the episode after creation or publish an existing draft")
     parser.add_argument("--use-bulletin", action="store_true", default=True)
     parser.add_argument("--no-bulletin", dest="use_bulletin", action="store_false")
     parser.add_argument("--bulletin-script", default=str(DEFAULT_BULLETIN_SCRIPT))
@@ -118,7 +120,7 @@ def main():
     show_id = resolve_show_id(api_key, configured_show_id)
 
     audio_path = Path(args.audio).expanduser()
-    if not audio_path.exists():
+    if not args.episode_id and not audio_path.exists():
         print(f"Audio file not found: {audio_path}", file=sys.stderr)
         return 2
 
@@ -142,6 +144,8 @@ def main():
     if args.dry_run:
         print(json.dumps({
             "audio": str(audio_path),
+            "episode_id": args.episode_id,
+            "publish": args.publish,
             "show_id": show_id,
             "title": title,
             "summary": summary,
@@ -156,21 +160,8 @@ def main():
         }, indent=2))
         return 0
 
-    auth = api_request("GET", "/episodes/authorize_upload", api_key, params={"filename": audio_path.name})
-    attrs = auth["data"]["attributes"]
-    upload_url = attrs["upload_url"]
-    audio_url = attrs["audio_url"]
-    content_type = attrs.get("content_type") or mime_type
-
-    status = upload_file(upload_url, content_type, audio_path)
-    if status not in (200, 201):
-        print(f"Upload failed with status {status}", file=sys.stderr)
-        return 1
-
     form = {
-        "episode[show_id]": show_id,
         "episode[title]": title,
-        "episode[audio_url]": audio_url,
         "episode[type]": args.episode_type,
     }
     if summary:
@@ -186,13 +177,48 @@ def main():
     if transcript_text:
         form["episode[transcript_text]"] = transcript_text
 
-    episode = api_request("POST", "/episodes", api_key, form=form)
+    if args.episode_id:
+        episode_id = args.episode_id
+        episode = api_request("PATCH", f"/episodes/{episode_id}", api_key, form=form)
+        if args.publish:
+            episode = api_request(
+                "PATCH",
+                f"/episodes/{episode_id}/publish",
+                api_key,
+                form={"episode[status]": "published"},
+            )
+    else:
+        auth = api_request("GET", "/episodes/authorize_upload", api_key, params={"filename": audio_path.name})
+        attrs = auth["data"]["attributes"]
+        upload_url = attrs["upload_url"]
+        audio_url = attrs["audio_url"]
+        content_type = attrs.get("content_type") or mime_type
+
+        status = upload_file(upload_url, content_type, audio_path)
+        if status not in (200, 201):
+            print(f"Upload failed with status {status}", file=sys.stderr)
+            return 1
+
+        create_form = dict(form)
+        create_form["episode[show_id]"] = show_id
+        create_form["episode[audio_url]"] = audio_url
+        episode = api_request("POST", "/episodes", api_key, form=create_form)
+        episode_id = episode["data"]["id"]
+        if args.publish:
+            episode = api_request(
+                "PATCH",
+                f"/episodes/{episode_id}/publish",
+                api_key,
+                form={"episode[status]": "published"},
+            )
+
     print(json.dumps({
         "episode_id": episode["data"]["id"],
         "status": episode["data"]["attributes"].get("status"),
         "title": episode["data"]["attributes"].get("title"),
         "share_url": episode["data"]["attributes"].get("share_url"),
         "audio_processing": episode["data"]["attributes"].get("audio_processing"),
+        "published_at": episode["data"]["attributes"].get("published_at"),
     }, indent=2))
     return 0
 
