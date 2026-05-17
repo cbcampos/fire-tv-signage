@@ -42,6 +42,7 @@
 | Investigate 8 error-state crons | ✅ DONE | 2026-03-31 | Found 4 actual error crons. All bumped to 300s timeout: Discord Daily Memory, Proactive Garmin Health, Proactive Intelligence, sermon-recap. Cron Health Daily, health-safety-watch, Morning Run Coach, Calendar Radar PM, Evening Wrap, Overnight Pain Scan, Sunday Content Planning, Weekly Slack Summary — all showing error. Need `openclaw cron runs <id>` on each to find root cause. |
 | Proactive garmy + bee integration | 🔴 PENDING | 2026-03-25 | Both tools underused. garmy (4x/wk) could feed running recommendations into morning digest proactively. bee context could be pulled before sessions. No code yet — scope this out first. |
 | Bee fact cleanup phase 2 | 🟡 IN PROGRESS | 2026-05-15 | Backup created at `tmp/bee-facts-export.jsonl`. First aggressive pass deleted 269 facts and reduced known count from ~7402 to ~7133. Phase-2 export at `tmp/bee-facts-export-phase2.jsonl`; earlier 3381 figure was a bad partial export. Next step: cluster remaining facts by theme (parenting, marriage, smart-home, running) and keep one canonical fact per theme before more deletions. |
+| Sermon audio extraction skill | 🟡 IN PROGRESS | 2026-05-17 | Built initial `sermon-audio` skill and `scripts/sermon_audio_extract.py`. Next step: run it against a real church-service WAV, tune sermon-boundary heuristics, and validate normalization output. |
 
 ---
 
@@ -66,6 +67,11 @@
 ---
 
 ## Progress Log
+
+### 2026-05-17
+- Created new `skills/sermon-audio/` skill graph with `SKILL.md`, `MOC.md`, `plan.md`, `run.md`, and `review.md`.
+- Built `scripts/sermon_audio_extract.py` to probe service audio, detect speech-heavy candidate windows, optionally transcribe candidates with local `whisper`, score likely sermon sections, cut the chosen span, and normalize final output with ffmpeg loudness tools.
+- Verified CLI help and Python syntax. Pending real-file validation and heuristic tuning once Chris drops the church WAV.
 
 ### 2026-03-25
 - Fixed `cron-health-check.sh` bash expansion bug — `$(NF-x)` was being misparsed by bash before awk, corrupting all cron field extraction. Replaced with `awk '{n=NF; print $(n-4)}'` pattern. Also added NF<6 guard to skip box-drawing separator lines from `openclaw cron list`. Verified working.
