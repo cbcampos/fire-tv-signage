@@ -8,6 +8,23 @@ links:
 
 # Run
 
+## Weekly end-to-end goal
+
+Future-state workflow:
+
+1. Chris plugs in the church USB drive.
+2. Chris says some version of: `go process this week's sermon`.
+3. Dobby finds the newest service recording on the USB drive.
+4. Dobby extracts the sermon-only audio.
+5. Dobby verifies and exports a louder final MP3.
+6. Dobby pulls the latest worship guide from Google Drive.
+7. Dobby extracts sermon title, speaker, scripture, and service date.
+8. Dobby creates a Transistor draft with that metadata.
+9. If everything looks good and approval is given, Dobby publishes it.
+10. Dobby replies with a thumbs-up style confirmation and the live share URL.
+
+That is now the intended weekly operating model.
+
 ## Basic usage
 
 ```bash
@@ -32,6 +49,102 @@ For actual church service recordings, this is the safest flow:
 4. Listen to the start and end boundaries.
 5. Only after the length is confirmed, make delivery MP3s.
 6. If the MP3 still feels quiet, create a separate louder delivery version from the confirmed full-length sermon-only WAV — not from any intermediate or test export.
+7. Pull bulletin metadata from Google Drive before creating the Transistor episode.
+8. Create the Transistor draft from the confirmed louder MP3.
+9. Publish only after the audio and metadata are approved.
+
+## End-to-end checklist for the weekly run
+
+### A. Find the source audio
+
+Usually the church USB appears under `/media/ccampos/<DRIVE_NAME>/`.
+
+Find likely sermon recordings:
+
+```bash
+find /media/ccampos -maxdepth 2 -type f \( -iname '*.wav' -o -iname '*.mp3' -o -iname '*.m4a' \) | sort
+```
+
+Pick the newest likely service file. On the real run, that was:
+
+```bash
+/media/ccampos/TRINITY1/R_20260517-100404.wav
+```
+
+### B. Run first-pass sermon extraction
+
+```bash
+python3 scripts/sermon_audio_extract.py \
+  /media/ccampos/TRINITY1/R_20260517-100404.wav \
+  --transcribe auto \
+  --output-dir outputs/sermons
+```
+
+### C. If the first cut is too broad, refine from transcript
+
+If `whisper` CLI is missing, use the local Python fallback workflow and inspect transcript cues to find the actual sermon start.
+
+Typical cues:
+- `If you've got a Bible, turn with me to...`
+- explicit scripture reading that begins the sermon proper
+- shift from announcements/music/prayer into exposition
+
+### D. Export the confirmed sermon-only WAV
+
+Keep the sermon-only WAV as the master source-of-truth.
+
+### E. Export the louder delivery MP3
+
+```bash
+ffmpeg -y -i outputs/sermons/R_20260517-100404.sermon-only.wav \
+  -af "highpass=f=80,acompressor=threshold=-20dB:ratio=2.5:attack=20:release=200:makeup=3,loudnorm=I=-14:TP=-1.0:LRA=10" \
+  -ar 48000 -c:a libmp3lame -b:a 160k \
+  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+```
+
+### F. Pull bulletin metadata
+
+```bash
+python3 scripts/transistor_bulletin_metadata.py
+```
+
+Expected output shape:
+- `title`
+- `speaker`
+- `scripture`
+- `service_date`
+- `file_id`
+- `file_name`
+
+### G. Create the Transistor draft
+
+```bash
+python3 scripts/transistor_sermon_upload.py \
+  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+```
+
+Defaults now come from the latest bulletin automatically:
+- title = sermon title
+- author = worship guide speaker
+- description = `Scripture Passage: ...`
+
+### H. Publish after approval
+
+For an existing reviewed draft:
+
+```bash
+python3 scripts/transistor_sermon_upload.py \
+  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3 \
+  --episode-id <draft_episode_id> \
+  --publish
+```
+
+### I. Final response to Chris
+
+The intended final user-facing response is short:
+- confirm the episode is live
+- provide the share URL
+- mention anything unusual only if something actually needed manual intervention
 
 ## Example from the May 17 church recording
 
