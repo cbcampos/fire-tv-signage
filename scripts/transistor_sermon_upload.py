@@ -3,6 +3,7 @@ import argparse
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -10,6 +11,7 @@ from pathlib import Path
 
 API_BASE = "https://api.transistor.fm/v1"
 DEFAULT_ENV = Path.home() / ".openclaw" / ".secrets" / "transistor.env"
+DEFAULT_BULLETIN_SCRIPT = Path.home() / ".openclaw" / "workspace" / "scripts" / "transistor_bulletin_metadata.py"
 
 
 def load_env_file(path: Path):
@@ -57,6 +59,18 @@ def get_shows(api_key: str):
     return api_request("GET", "/shows", api_key).get("data", [])
 
 
+def load_bulletin_metadata(script_path: Path):
+    if not script_path.exists():
+        return {}
+    result = subprocess.run(
+        ["python3", str(script_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(result.stdout)
+
+
 def resolve_show_id(api_key: str, configured_show_id: str | None):
     if configured_show_id:
         return configured_show_id
@@ -87,6 +101,9 @@ def main():
     parser.add_argument("--number", type=int)
     parser.add_argument("--episode-type", default="full", choices=["full", "trailer", "bonus"])
     parser.add_argument("--transcript-file")
+    parser.add_argument("--use-bulletin", action="store_true", default=True)
+    parser.add_argument("--no-bulletin", dest="use_bulletin", action="store_false")
+    parser.add_argument("--bulletin-script", default=str(DEFAULT_BULLETIN_SCRIPT))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -105,10 +122,16 @@ def main():
         print(f"Audio file not found: {audio_path}", file=sys.stderr)
         return 2
 
-    title = args.title or audio_path.stem
+    bulletin = {}
+    if args.use_bulletin:
+        bulletin = load_bulletin_metadata(Path(args.bulletin_script).expanduser())
+
+    title = args.title or bulletin.get("title") or audio_path.stem
     summary = args.summary if args.summary is not None else os.environ.get("TRANSISTOR_DEFAULT_SUMMARY", "")
     description = args.description if args.description is not None else os.environ.get("TRANSISTOR_DEFAULT_DESCRIPTION", "")
-    author = args.author if args.author is not None else os.environ.get("TRANSISTOR_DEFAULT_AUTHOR", "")
+    if not description and bulletin.get("scripture"):
+        description = f"Scripture Passage: {bulletin['scripture']}"
+    author = args.author if args.author is not None else bulletin.get("speaker") or os.environ.get("TRANSISTOR_DEFAULT_AUTHOR", "")
 
     transcript_text = None
     if args.transcript_file:
@@ -129,6 +152,7 @@ def main():
             "episode_type": args.episode_type,
             "transcript_attached": bool(transcript_text),
             "mime_type": mime_type,
+            "bulletin": bulletin,
         }, indent=2))
         return 0
 
