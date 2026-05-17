@@ -30,3 +30,14 @@ After a run, inspect:
 
 ## Practical recommendation
 Use auto-detect + transcript first. For important sermon archives, do a 2-minute spot check near the boundaries before publishing.
+
+## What this real run taught us
+- Audio-only heuristics can wildly over-select and include much of the service.
+- Transcript cues were the reliable way to find the real sermon opening.
+- The approved sermon cut can still sound too quiet even after the base normalization pass.
+- Keep two deliverables when needed:
+  - the clean sermon-only master
+  - a louder delivery MP3 for easier listening/share-out
+- Before replacing a shared file, verify both:
+  - the boundary length is still correct
+  - the louder export was made from the correct full sermon master

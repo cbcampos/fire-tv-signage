@@ -82,6 +82,27 @@ node ~/.openclaw/workspace/fire-tv-signage/backend/cli.mjs library list
 
 ---
 
+## Sermon Audio Workflow
+
+When editing church service recordings into sermon-only files, use this workflow:
+
+1. Run `python3 scripts/sermon_audio_extract.py <service-audio> --transcribe auto --output-dir outputs/sermons`
+2. Review the first-pass result before sharing anything.
+3. If the cut is too broad, use transcript-assisted refinement to identify the actual sermon start/end.
+4. Treat the sermon-only WAV as the master.
+5. Make shareable MP3s from that confirmed sermon-only WAV only.
+6. If the first normalized export still sounds quiet, create a second louder delivery MP3 rather than replacing the master.
+7. Before uploading or sharing, verify duration so a partial/test render is not mistaken for the final sermon.
+
+Known good louder export recipe:
+
+```bash
+ffmpeg -y -i outputs/sermons/<basename>.sermon-only.wav \
+  -af "highpass=f=80,acompressor=threshold=-20dB:ratio=2.5:attack=20:release=200:makeup=3,loudnorm=I=-14:TP=-1.0:LRA=10" \
+  -ar 48000 -c:a libmp3lame -b:a 160k \
+  outputs/sermons/<basename>.sermon-only.full-louder.mp3
+```
+
 ## Codex Sub-Agent
 
 **Spawn a Codex coding sub-agent:**
