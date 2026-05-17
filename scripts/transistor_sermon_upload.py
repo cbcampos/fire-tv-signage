@@ -53,6 +53,25 @@ def upload_file(upload_url: str, content_type: str, audio_path: Path):
         return resp.status
 
 
+def get_shows(api_key: str):
+    return api_request("GET", "/shows", api_key).get("data", [])
+
+
+def resolve_show_id(api_key: str, configured_show_id: str | None):
+    if configured_show_id:
+        return configured_show_id
+    shows = get_shows(api_key)
+    if len(shows) == 1:
+        return shows[0]["id"]
+    if not shows:
+        print("No Transistor shows available for this API key", file=sys.stderr)
+        raise SystemExit(2)
+    print("Multiple Transistor shows found; set TRANSISTOR_SHOW_ID explicitly.", file=sys.stderr)
+    for show in shows:
+        print(f"- {show['id']}: {show.get('attributes', {}).get('title', '(untitled)')}", file=sys.stderr)
+    raise SystemExit(2)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Upload a sermon MP3 to Transistor and create a draft episode"
@@ -73,14 +92,13 @@ def main():
 
     load_env_file(Path(args.env_file).expanduser())
     api_key = os.environ.get("TRANSISTOR_API_KEY")
-    show_id = args.show_id or os.environ.get("TRANSISTOR_SHOW_ID")
+    configured_show_id = args.show_id or os.environ.get("TRANSISTOR_SHOW_ID")
 
     if not api_key:
         print("Missing TRANSISTOR_API_KEY", file=sys.stderr)
         return 2
-    if not show_id:
-        print("Missing TRANSISTOR_SHOW_ID", file=sys.stderr)
-        return 2
+
+    show_id = resolve_show_id(api_key, configured_show_id)
 
     audio_path = Path(args.audio).expanduser()
     if not audio_path.exists():
