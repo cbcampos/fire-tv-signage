@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import mimetypes
+import os
+import sys
+import urllib.parse
+import urllib.request
+from pathlib import Path
+
+API_BASE = "https://api.transistor.fm/v1"
+DEFAULT_ENV = Path.home() / ".openclaw" / ".secrets" / "transistor.env"
+
+
+def load_env_file(path: Path):
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def api_request(method: str, path: str, api_key: str, params=None, form=None):
+    url = API_BASE + path
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    data = None
+    headers = {
+        "x-api-key": api_key,
+        "Accept": "application/json",
+    }
+    if form is not None:
+        data = urllib.parse.urlencode(form).encode()
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req) as resp:
+        return json.load(resp)
+
+
+def upload_file(upload_url: str, content_type: str, audio_path: Path):
+    with audio_path.open("rb") as handle:
+        data = handle.read()
+    req = urllib.request.Request(
+        upload_url,
+        data=data,
+        method="PUT",
+        headers={"Content-Type": content_type},
+    )
+    with urllib.request.urlopen(req) as resp:
+        return resp.status
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Upload a sermon MP3 to Transistor and create a draft episode"
+    )
+    parser.add_argument("audio", help="Path to audio file")
+    parser.add_argument("--env-file", default=str(DEFAULT_ENV))
+    parser.add_argument("--show-id")
+    parser.add_argument("--title")
+    parser.add_argument("--summary")
+    parser.add_argument("--description")
+    parser.add_argument("--author")
+    parser.add_argument("--season", type=int)
+    parser.add_argument("--number", type=int)
+    parser.add_argument("--episode-type", default="full", choices=["full", "trailer", "bonus"])
+    parser.add_argument("--transcript-file")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    load_env_file(Path(args.env_file).expanduser())
+    api_key = os.environ.get("TRANSISTOR_API_KEY")
+    show_id = args.show_id or os.environ.get("TRANSISTOR_SHOW_ID")
+
+    if not api_key:
+        print("Missing TRANSISTOR_API_KEY", file=sys.stderr)
+        return 2
+    if not show_id:
+        print("Missing TRANSISTOR_SHOW_ID", file=sys.stderr)
+        return 2
+
+    audio_path = Path(args.audio).expanduser()
+    if not audio_path.exists():
+        print(f"Audio file not found: {audio_path}", file=sys.stderr)
+        return 2
+
+    title = args.title or audio_path.stem
+    summary = args.summary if args.summary is not None else os.environ.get("TRANSISTOR_DEFAULT_SUMMARY", "")
+    description = args.description if args.description is not None else os.environ.get("TRANSISTOR_DEFAULT_DESCRIPTION", "")
+    author = args.author if args.author is not None else os.environ.get("TRANSISTOR_DEFAULT_AUTHOR", "")
+
+    transcript_text = None
+    if args.transcript_file:
+        transcript_text = Path(args.transcript_file).expanduser().read_text()
+
+    mime_type = mimetypes.guess_type(str(audio_path))[0] or "audio/mpeg"
+
+    if args.dry_run:
+        print(json.dumps({
+            "audio": str(audio_path),
+            "show_id": show_id,
+            "title": title,
+            "summary": summary,
+            "description": description,
+            "author": author,
+            "season": args.season,
+            "number": args.number,
+            "episode_type": args.episode_type,
+            "transcript_attached": bool(transcript_text),
+            "mime_type": mime_type,
+        }, indent=2))
+        return 0
+
+    auth = api_request("GET", "/episodes/authorize_upload", api_key, params={"filename": audio_path.name})
+    attrs = auth["data"]["attributes"]
+    upload_url = attrs["upload_url"]
+    audio_url = attrs["audio_url"]
+    content_type = attrs.get("content_type") or mime_type
+
+    status = upload_file(upload_url, content_type, audio_path)
+    if status not in (200, 201):
+        print(f"Upload failed with status {status}", file=sys.stderr)
+        return 1
+
+    form = {
+        "episode[show_id]": show_id,
+        "episode[title]": title,
+        "episode[audio_url]": audio_url,
+        "episode[type]": args.episode_type,
+    }
+    if summary:
+        form["episode[summary]"] = summary
+    if description:
+        form["episode[description]"] = description
+    if author:
+        form["episode[author]"] = author
+    if args.season is not None:
+        form["episode[season]"] = str(args.season)
+    if args.number is not None:
+        form["episode[number]"] = str(args.number)
+    if transcript_text:
+        form["episode[transcript_text]"] = transcript_text
+
+    episode = api_request("POST", "/episodes", api_key, form=form)
+    print(json.dumps({
+        "episode_id": episode["data"]["id"],
+        "status": episode["data"]["attributes"].get("status"),
+        "title": episode["data"]["attributes"].get("title"),
+        "share_url": episode["data"]["attributes"].get("share_url"),
+        "audio_processing": episode["data"]["attributes"].get("audio_processing"),
+    }, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
