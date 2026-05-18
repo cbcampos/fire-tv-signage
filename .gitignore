@@ -1,0 +1,75 @@
+# Local Netlify folders
+.netlify/
+**/.netlify/
+
+# Secrets and local machine state
+.secrets/
+**/.secrets/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.k2
+.openclaw/workspace-state.json
+.openclaw/trajectory-exports/
+.clawhub/
+.herenow/
+data/.herenow/
+.mm/
+.obsidian/workspace*.json
+.obsidian/app.json
+.obsidian/appearance.json
+.obsidian/core-plugins.json
+.obsidian/graph.json
+.stfolder/
+
+# Dependency installs and virtual environments
+node_modules/
+**/node_modules/
+venv/
+venv-*/
+venv_*/
+bid-venv/
+.venv/
+**/.venv/
+**/.venv-tools/
+
+# Language/build caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+**/.cache/
+dist/
+build/
+out/
+coverage/
+.gradle/
+**/.gradle/
+**/local.properties
+**/app/build/
+
+# Runtime logs and transient outputs
+logs/
+**/logs/
+*.log
+tmp/
+**/tmp/
+*.tmp
+*.bak
+*.bak-*
+
+# Large generated artifacts
+*.tar.gz
+*.onnx
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
