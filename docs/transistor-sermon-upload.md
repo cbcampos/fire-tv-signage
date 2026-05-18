@@ -3,6 +3,8 @@
 ## What this does
 Uploads a local sermon audio file to Transistor.fm, creates a **draft** episode, and can now **publish** an approved draft.
 
+For the weekly church workflow, the intended source audio is now the standardized sermon delivery MP3 rendered from the confirmed sermon-only WAV master.
+
 Scripts:
 - `scripts/transistor_sermon_upload.py`
 - `scripts/transistor_bulletin_metadata.py`
@@ -74,14 +76,14 @@ Real draft upload using bulletin defaults:
 
 ```bash
 python3 scripts/transistor_sermon_upload.py \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3
 ```
 
 With transcript:
 
 ```bash
 python3 scripts/transistor_sermon_upload.py \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3 \
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3 \
   --transcript-file outputs/sermons/R_20260517-100404.fulltranscript.txt
 ```
 
@@ -89,7 +91,7 @@ Publish an existing approved draft:
 
 ```bash
 python3 scripts/transistor_sermon_upload.py \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3 \
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3 \
   --episode-id 3265346 \
   --publish
 ```
@@ -100,12 +102,20 @@ From the first live run, the correct draft pattern is:
 - title: sermon title only
 - author: speaker from worship guide
 - description: `Scripture Passage: <references>`
-- audio: louder final sermon-only MP3
+- audio: standardized final sermon-only MP3 rendered from the confirmed WAV master
 
 Example:
 - title: `From Glory To Glory`
 - author: `Brandon Nelson`
 - description: `Scripture Passage: Exodus 34:29-35; 2 Corinthians 3:7-18`
+
+## Recommended weekly publishing baseline
+For consistency across weeks:
+- keep the sermon-only WAV as the master
+- render the delivery MP3 from that WAV every time
+- prefer a conservative spoken-word profile over aggressive boost
+- use the standard delivery file as the default upload target
+- only create hotter alternates as comparison files when a specific recording needs it
 
 ## Recommended future metadata
 Useful fields to standardize later:

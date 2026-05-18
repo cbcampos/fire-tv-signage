@@ -16,7 +16,7 @@ Future-state workflow:
 2. Chris says some version of: `go process this week's sermon`.
 3. Dobby finds the newest service recording on the USB drive.
 4. Dobby extracts the sermon-only audio.
-5. Dobby verifies and exports a louder final MP3.
+5. Dobby verifies the cut, exports a standardized sermon master, and renders a consistent delivery MP3.
 6. Dobby pulls the latest worship guide from Google Drive.
 7. Dobby extracts sermon title, speaker, scripture, and service date.
 8. Dobby creates a Transistor draft with that metadata.
@@ -48,10 +48,11 @@ For actual church service recordings, this is the safest flow:
 3. Export the sermon-only WAV first.
 4. Listen to the start and end boundaries.
 5. Only after the length is confirmed, make delivery MP3s.
-6. If the MP3 still feels quiet, create a separate louder delivery version from the confirmed full-length sermon-only WAV — not from any intermediate or test export.
-7. Pull bulletin metadata from Google Drive before creating the Transistor episode.
-8. Create the Transistor draft from the confirmed louder MP3.
-9. Publish only after the audio and metadata are approved.
+6. Use the sermon-only WAV as the master and render the delivery MP3 from that master every time — never from a prior MP3.
+7. Default to a consistent spoken-word normalization profile with lighter compression and a safer ceiling so week-to-week levels stay stable.
+8. Pull bulletin metadata from Google Drive before creating the Transistor episode.
+9. Create the Transistor draft from the confirmed delivery MP3.
+10. Publish only after the audio and metadata are approved.
 
 ## End-to-end checklist for the weekly run
 
@@ -93,14 +94,25 @@ Typical cues:
 
 Keep the sermon-only WAV as the master source-of-truth.
 
-### E. Export the louder delivery MP3
+### E. Export the standardized delivery MP3
+
+Default profile for future weeks:
+- source: confirmed `*.sermon-only.wav` only
+- high-pass filter at 80 Hz
+- lighter compression for speech consistency, not hype
+- louder normalized spoken-word target
+- safer true-peak ceiling to avoid edge-case clipping from hot recordings
+
+Recommended command:
 
 ```bash
 ffmpeg -y -i outputs/sermons/R_20260517-100404.sermon-only.wav \
-  -af "highpass=f=80,acompressor=threshold=-20dB:ratio=2.5:attack=20:release=200:makeup=3,loudnorm=I=-14:TP=-1.0:LRA=10" \
+  -af "highpass=f=80,acompressor=threshold=-22dB:ratio=2.0:attack=20:release=220:makeup=1,loudnorm=I=-15:TP=-1.5:LRA=11" \
   -ar 48000 -c:a libmp3lame -b:a 160k \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3
 ```
+
+If a specific week is unusually quiet, start here before making it hotter. The goal is consistency across weeks, not maximum loudness on a single sermon.
 
 ### F. Pull bulletin metadata
 
@@ -120,7 +132,7 @@ Expected output shape:
 
 ```bash
 python3 scripts/transistor_sermon_upload.py \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3
 ```
 
 Defaults now come from the latest bulletin automatically:
@@ -134,7 +146,7 @@ For an existing reviewed draft:
 
 ```bash
 python3 scripts/transistor_sermon_upload.py \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3 \
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3 \
   --episode-id <draft_episode_id> \
   --publish
 ```
@@ -180,16 +192,22 @@ If `--transcribe auto` does not run because the `whisper` CLI is unavailable, a 
 3. Use transcript phrases like “turn with me to…” or the opening scripture invitation to find the sermon start.
 4. Re-cut using the confirmed timestamps.
 
-## Louder delivery export
+## Standard delivery export
 
-After the sermon-only WAV is confirmed, create a louder MP3 delivery version like this:
+After the sermon-only WAV is confirmed, create the default delivery MP3 like this:
 
 ```bash
 ffmpeg -y -i outputs/sermons/R_20260517-100404.sermon-only.wav \
-  -af "highpass=f=80,acompressor=threshold=-20dB:ratio=2.5:attack=20:release=200:makeup=3,loudnorm=I=-14:TP=-1.0:LRA=10" \
+  -af "highpass=f=80,acompressor=threshold=-22dB:ratio=2.0:attack=20:release=220:makeup=1,loudnorm=I=-15:TP=-1.5:LRA=11" \
   -ar 48000 -c:a libmp3lame -b:a 160k \
-  outputs/sermons/R_20260517-100404.sermon-only.full-louder.mp3
+  outputs/sermons/R_20260517-100404.sermon-only.standard.mp3
 ```
+
+This is now the preferred weekly baseline because it is more conservative and more likely to stay natural across different recordings.
+
+## Optional louder fallback
+
+If a given week still feels too quiet after review, create a separate louder comparison export from the same confirmed sermon-only WAV rather than replacing the standard delivery immediately.
 
 ## Critical pitfall
 
