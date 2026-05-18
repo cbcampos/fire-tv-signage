@@ -1,0 +1,61 @@
+8141819	2026-05-18 13:01	COMPLETED	226	Relationship tension and communication conflict
+8140577	2026-05-18 11:21	COMPLETED	1048	Morning routine with Franklin
+8134465	2026-05-17 22:13	COMPLETED	696	Lowes gift card dinner prep
+8132999	2026-05-17 20:18	COMPLETED	1138	Family backyard playtime
+8131586	2026-05-17 18:26	COMPLETED	410	Bedtime stories with family
+8130762	2026-05-17 17:19	COMPLETED	1006	Family lunch and nap time
+8130032	2026-05-17 16:17	COMPLETED	1472	Church setup and family errands
+8129354	2026-05-17 15:20	COMPLETED	960	Church sermon on divine glory
+8128492	2026-05-17 14:00	COMPLETED	234	Family yard work and church prep
+8127523	2026-05-17 11:53	COMPLETED	1920	Silly things and morning routine
+8124881	2026-05-17 03:04	COMPLETED	34	Searching for missing items
+8123843	2026-05-17 01:19	COMPLETED	368	Watching running documentary together
+8123390	2026-05-17 00:39	COMPLETED	150	Family evening with pasta dinner
+8120843	2026-05-16 21:05	COMPLETED	3504	Family evening at home
+8119019	2026-05-16 18:49	COMPLETED	530	Bathtime and bedtime routine
+8115463	2026-05-16 14:15	COMPLETED	524	May's first birthday party
+8113568	2026-05-16 10:07	COMPLETED	1766	Running group workout planning
+8110376	2026-05-16 01:44	COMPLETED	20	May's Silly Goose Painting
+8106199	2026-05-15 21:13	COMPLETED	4942	Division retreat and family evening
+8105619	2026-05-15 20:41	COMPLETED	690	AI strategy retreat discussion
+8104640	2026-05-15 19:54	COMPLETED	918	AI Strategy Retreat Discussion
+8103377	2026-05-15 18:59	COMPLETED	1190	AI infrastructure and training needs
+8101658	2026-05-15 17:38	COMPLETED	1462	Strategic planning retreat session
+8100114	2026-05-15 16:30	COMPLETED	576	Event setup and AV testing
+8099814	2026-05-15 16:14	COMPLETED	120	Room setup and tech check
+8098275	2026-05-15 15:05	COMPLETED	494	AI retreat facilitation preparation
+8097718	2026-05-15 14:38	COMPLETED	28	Web page styling discussion
+8095898	2026-05-15 12:56	COMPLETED	246	Getting kids ready for school
+8091383	2026-05-15 02:33	COMPLETED	1600	Marital conflict and emotional disconnect
+8089474	2026-05-15 00:19	COMPLETED	826	Bathtime and bedtime with kids
+8087362	2026-05-14 22:39	COMPLETED	2010	Family dinner and conflict
+8083154	2026-05-14 19:20	COMPLETED	3244	Marvel audiobook family evening
+8079449	2026-05-14 16:40	COMPLETED	100	Zoom setup and office chat
+8078843	2026-05-14 16:12	COMPLETED	100	Meeting prep and tech setup
+8076180	2026-05-14 14:14	COMPLETED	236	Relationship accountability argument
+8074944	2026-05-14 13:09	COMPLETED	750	Work and Harry Potter mix
+8073444	2026-05-14 11:15	COMPLETED	1424	Morning routine and marital tension
+8070721	2026-05-14 03:42	COMPLETED	116	Helping with parking directions
+8068508	2026-05-14 00:44	COMPLETED	1522	Family prayer group gathering
+8064752	2026-05-13 21:16	COMPLETED	3938	Family day and Bible study
+8062109	2026-05-13 19:20	COMPLETED	1896	Chris helps plan faculty retreat
+8056042	2026-05-13 15:02	COMPLETED	2700	Team Grant and Website Review
+8054764	2026-05-13 14:01	COMPLETED	974	HEAL newsletter planning meeting
+8053796	2026-05-13 13:10	COMPLETED	20	Newsletter creation process guidance
+8052575	2026-05-13 11:45	COMPLETED	1026	Morning school routine chaos
+8048814	2026-05-13 02:49	COMPLETED	918	Strike Force 5 Reunion
+8044700	2026-05-12 22:31	COMPLETED	2412	Planning May's birthday party
+8042825	2026-05-12 21:00	COMPLETED	714	Church venue setup planning
+8040545	2026-05-12 19:18	COMPLETED	106	Visiting a new church
+8032834	2026-05-12 13:41	COMPLETED	130	Family morning with baby
+8032136	2026-05-12 13:03	COMPLETED	214	Family morning with work advice
+8030951	2026-05-12 11:38	COMPLETED	1014	Franklin morning routine chaos
+8024153	2026-05-11 23:05	COMPLETED	1496	Evening routine with Franklin
+8023131	2026-05-11 22:11	COMPLETED	350	Family evening with Franklin
+8020357	2026-05-11 20:02	COMPLETED	210	Parenting during work meeting
+8019293	2026-05-11 19:17	COMPLETED	600	Family car ride and errands
+8018404	2026-05-11 18:41	COMPLETED	72	Daycare drop-off for May
+8018018	2026-05-11 18:25	COMPLETED	68	Friday scheduling and car errands
+8016458	2026-05-11 17:19	COMPLETED	70	Vehicle repair shop visit
+8015395	2026-05-11 16:33	COMPLETED	182	Car repair shop consultation
+8014184	2026-05-11 15:39	COMPLETED	120	Vehicle inspection and tire repair
