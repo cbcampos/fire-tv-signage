@@ -49,6 +49,31 @@ def parse_hms(value):
     return int(h) * 3600 + int(m) * 60 + float(s)
 
 
+def validate_time_range(start, end, total_duration):
+    if start < 0 or end < 0:
+        raise ValueError("Start and end times must be non-negative")
+    if start >= end:
+        raise ValueError("Start time must be before end time")
+    if start > total_duration:
+        raise ValueError(
+            f"Start time {to_hms(start)} is beyond input duration {to_hms(total_duration)}"
+        )
+    if end > total_duration:
+        raise ValueError(
+            f"End time {to_hms(end)} is beyond input duration {to_hms(total_duration)}"
+        )
+
+
+def add_review_times(decision):
+    if 'start' in decision:
+        decision['start_hms'] = to_hms(decision['start'])
+    if 'end' in decision:
+        decision['end_hms'] = to_hms(decision['end'])
+    if 'duration' in decision:
+        decision['duration_hms'] = to_hms(decision['duration'])
+    return decision
+
+
 def ensure_dir(path):
     Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -274,11 +299,18 @@ def main():
     if manual:
         start = parse_hms(args.start) if args.start else 0.0
         end = parse_hms(args.end) if args.end else total_duration
+        try:
+            validate_time_range(start, end, total_duration)
+        except ValueError as exc:
+            print(f'Invalid manual boundary: {exc}', file=sys.stderr)
+            if not args.keep_temp:
+                temp_dir_obj.cleanup()
+            return 2
         decision = {
             'mode': 'manual_override',
             'start': start,
             'end': end,
-            'duration': max(0.0, end - start),
+            'duration': end - start,
         }
     else:
         scored = []
@@ -304,6 +336,7 @@ def main():
             'all_candidates': scored,
             'transcription_used': should_transcribe,
         }
+    add_review_times(decision)
 
     out_audio = out_dir / f'{stem}.sermon.{args.format}'
     segments_json = out_dir / f'{stem}.segments.json'

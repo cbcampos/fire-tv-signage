@@ -10,7 +10,7 @@ links:
 ## What to inspect
 After a run, inspect:
 - `<basename>.segments.json` for all candidate windows
-- `<basename>.decision.json` for the chosen sermon span and score breakdown
+- `<basename>.decision.json` for the chosen sermon span, human-readable `*_hms` times, and score breakdown
 - `<basename>.transcript.txt` for sermon cue quality when transcription was enabled
 
 ## Signs the auto-cut is good
@@ -25,8 +25,10 @@ After a run, inspect:
 
 ## Fast correction flow
 1. Read `decision.json`
-2. Listen near the proposed start and end
+2. Listen near the proposed `start_hms` and `end_hms`
 3. Re-run with `--start` and/or `--end`
+
+Manual boundaries are validated before export. If `--start` is after `--end`, negative, or outside the input duration, the script exits without writing a cut.
 
 ## Practical recommendation
 Use auto-detect + transcript first. For important sermon archives, do a 2-minute spot check near the boundaries before publishing.

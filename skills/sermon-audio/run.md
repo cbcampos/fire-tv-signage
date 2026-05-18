@@ -243,10 +243,11 @@ python3 scripts/sermon_audio_extract.py /path/to/service.wav \
 ## What the script writes
 - final sermon audio
 - `.segments.json`
-- `.decision.json`
+- `.decision.json` with seconds plus `start_hms`, `end_hms`, and `duration_hms` for quick review
 - `.transcript.txt` when transcription runs
 
 ## Notes
 - `auto` transcription runs only if a local `whisper` binary is available.
 - If transcription is unavailable, the extractor falls back to audio-only heuristics.
 - If auto-detection is ambiguous, use the decision JSON and override `--start`/`--end`.
+- Manual boundaries are checked before export so a reversed or out-of-range cut fails fast.
