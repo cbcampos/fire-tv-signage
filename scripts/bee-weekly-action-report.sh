@@ -82,12 +82,17 @@ python3 "$ROOT_DIR/scripts/bee-weekly-action-report.py" build \
 python3 "$ROOT_DIR/scripts/bee-weekly-action-report.py" render \
   --report-root "$REPORT_ROOT"
 
+DOCX_STATUS="not rendered"
+PDF_STATUS="not rendered"
+[[ -s "$DOCX_OUT" ]] && DOCX_STATUS="$DOCX_OUT"
+[[ -s "$PDF_OUT" ]] && PDF_STATUS="$PDF_OUT"
+
 cat <<EOF
 Bee weekly actionable report complete.
 Report root: $REPORT_ROOT
 Source dir: $SOURCE_DIR
 Action report: $ACTION_MD
-DOCX: $DOCX_OUT
-PDF: $PDF_OUT
+DOCX: $DOCX_STATUS
+PDF: $PDF_STATUS
 Window: $SINCE_LOCAL → $UNTIL_LOCAL $TZ_NAME
 EOF
