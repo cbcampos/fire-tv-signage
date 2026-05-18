@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 USER_HOME = WORKSPACE.split("/.openclaw/", 1)[0] if "/.openclaw/" in WORKSPACE else os.path.expanduser("~")
@@ -20,8 +20,12 @@ TPATH = os.path.join(WORKSPACE, "skills/google-home-visual/interactive-recipe-ca
 RDIR = "/tmp/daily-recipe"
 KOKORO = os.path.join(WORKSPACE, "scripts/kokoro_tts.sh")
 DCAST = os.path.join(WORKSPACE, "skills/dashcast/dashcast.py")
-TODAY = date.today().strftime("%Y-%m-%d")
+MEAL_PLAN_PATH = os.path.join(WORKSPACE, "memory/meal-plan-current.md")
+TODAY_OBJ = date.today()
+TODAY = TODAY_OBJ.strftime("%Y-%m-%d")
+TODAY_MONTH_DAY = TODAY_OBJ.strftime("%b %d")
 DINNER_PROJECT_IDS = {"2328094641", "6fwwjRCMPhWF76mR"}
+RECIPE_PAYLOAD_SCHEMA = 2
 
 
 def load_secret(name):
@@ -60,13 +64,76 @@ def fetch_todoist():
         for task in tasks:
             due = task.get("due") or {}
             labels = {str(label).lower() for label in (task.get("labels") or [])}
-            if (
-                due.get("date", "").startswith(TODAY)
-                and task.get("content")
-                and (str(project_id) in DINNER_PROJECT_IDS or "dinner" in labels)
-            ):
+            if due.get("date", "").startswith(TODAY) and task.get("content"):
+                return task["content"], task.get("description") or ""
+        for task in tasks:
+            labels = {str(label).lower() for label in (task.get("labels") or [])}
+            if task.get("content") and "dinner" in labels:
                 return task["content"], task.get("description") or ""
     return None, None
+
+
+def fetch_meal_plan_recipe():
+    if not os.path.exists(MEAL_PLAN_PATH):
+        return None
+    try:
+        text = open(MEAL_PLAN_PATH, encoding="utf-8").read()
+    except OSError:
+        return None
+    if TODAY_MONTH_DAY not in text or "## " not in text:
+        return None
+    section_pattern = re.compile(rf"^##\s+(?P<title>.+?)\s+·\s+.*?\b{re.escape(TODAY_MONTH_DAY)}\b.*?$", re.MULTILINE)
+    match = section_pattern.search(text)
+    if not match:
+        return None
+    start = match.start()
+    next_match = re.search(r"^##\s+", text[match.end():], re.MULTILINE)
+    end = match.end() + next_match.start() if next_match else len(text)
+    section = text[start:end]
+    title = match.group("title").strip()
+    servings = "4 servings"
+    time_value = "45 min"
+    temp_value = "425°F"
+    serves_match = re.search(r"\*\*Serves\s+([^*]+)\*\*", section)
+    if serves_match:
+        servings = f"{serves_match.group(1).strip()} servings"
+    meta_match = re.search(r"\*\*Serves[^\n]*\n", section)
+    if meta_match:
+        meta_line = meta_match.group(0)
+        time_match = re.search(r"·\s*([^·\n]+)$", meta_line)
+        if time_match:
+            time_value = time_match.group(1).strip()
+    temp_match = re.search(r"\((\d+°F)\)", section)
+    if temp_match:
+        temp_value = temp_match.group(1)
+    ingredients = []
+    ing_match = re.search(r"\*\*INGREDIENTS:\*\*\n(?P<body>.*?)(?:\n\n\*\*INSTRUCTIONS:\*\*)", section, re.S)
+    if ing_match:
+        for line in ing_match.group("body").splitlines():
+            line = line.strip()
+            if not line.startswith("-"):
+                continue
+            item = re.sub(r"^-\s*", "", line)
+            ingredients.append({"amount": "", "item": item})
+    steps = []
+    steps_match = re.search(r"\*\*INSTRUCTIONS:\*\*\n(?P<body>.*?)(?:\n\n---|\Z)", section, re.S)
+    if steps_match:
+        for line in steps_match.group("body").splitlines():
+            line = line.strip()
+            if re.match(r"^\d+[\.)]\s*", line):
+                steps.append(re.sub(r"^\d+[\.)]\s*", "", line))
+    if not title or not steps:
+        return None
+    emoji_match = re.match(r"^\s*(\S)", title)
+    return {
+        "name": title,
+        "emoji": emoji_match.group(1) if emoji_match else "🍽️",
+        "ingredients": ingredients,
+        "steps": steps,
+        "temp": temp_value,
+        "time": time_value,
+        "servings": servings,
+    }
 
 
 def parse_recipe(content, description):
@@ -120,11 +187,16 @@ def extract_timer(text):
     return match.group(0) if match else ""
 
 
+def looks_like_emoji(token):
+    return bool(token) and len(token) <= 4 and not re.search(r"[A-Za-z0-9]", token)
+
+
 def split_title(name, fallback_emoji):
     match = re.match(r"^\s*(\S+)\s+(.*)$", name.strip())
-    if match and len(match.group(1)) <= 3:
+    if match and looks_like_emoji(match.group(1)):
         return match.group(1), match.group(2).strip()
-    return fallback_emoji, name.strip()
+    emoji = fallback_emoji if looks_like_emoji(fallback_emoji) else "🍽️"
+    return emoji, name.strip()
 
 
 def summarize_step(step, index):
@@ -161,6 +233,15 @@ def gen_audio(steps):
     return audio_data
 
 
+def normalize_audio_list(audio_base64, step_count):
+    audio = list(audio_base64 or [])
+    if len(audio) < step_count:
+        audio.extend([""] * (step_count - len(audio)))
+    elif len(audio) > step_count:
+        audio = audio[:step_count]
+    return audio
+
+
 def load_existing_audio(step_count):
     audio_data = []
     for index in range(step_count):
@@ -174,33 +255,78 @@ def load_existing_audio(step_count):
 
 def build_recipe_payload(recipe, audio_base64=None):
     emoji, display_title = split_title(recipe["name"], recipe["emoji"])
-    # Template JS expects steps as plain string[], not objects
-    steps_strings = list(recipe["steps"])
-    ingredient_count = len(recipe["ingredients"])
+    steps_strings = [str(step).strip() for step in recipe["steps"] if str(step).strip()]
     step_count = len(steps_strings)
-    # Template expects [[amount, name]] format for ingredients
+    audio = normalize_audio_list(audio_base64, step_count)
     ingredients_flat = [
         [ing.get("amount", ""), ing.get("item", "")]
         for ing in recipe["ingredients"]
     ]
     return {
-        "title": recipe["name"],
+        "schemaVersion": RECIPE_PAYLOAD_SCHEMA,
+        "generatedAt": datetime.now().isoformat(timespec="seconds"),
+        "generatedFor": TODAY,
+        "name": recipe["name"],
+        "title": display_title,
         "emoji": emoji,
         "steps": steps_strings,
         "ingredients": ingredients_flat,
         "temp": recipe["temp"],
         "time": recipe["time"],
         "servings": recipe["servings"],
-        "stepAudio": audio_base64 or [],
+        "state": {"currentStep": -1, "screen": "overview"},
+        "stepAudio": audio,
+        "audioManifest": [
+            {"index": index, "step": step, "audio": audio[index]}
+            for index, step in enumerate(steps_strings)
+        ],
+        "counts": {
+            "ingredients": len(ingredients_flat),
+            "steps": step_count,
+            "audio": sum(1 for item in audio if item),
+        },
     }
 
 
+def validate_recipe_payload(payload):
+    errors = []
+    if payload.get("schemaVersion") != RECIPE_PAYLOAD_SCHEMA:
+        errors.append("unexpected schemaVersion")
+    if not payload.get("title"):
+        errors.append("missing title")
+    if not isinstance(payload.get("steps"), list) or not payload["steps"]:
+        errors.append("missing steps")
+    if not isinstance(payload.get("ingredients"), list):
+        errors.append("missing ingredients")
+    step_count = len(payload.get("steps") or [])
+    if len(payload.get("stepAudio") or []) != step_count:
+        errors.append("stepAudio length does not match steps length")
+    manifest = payload.get("audioManifest") or []
+    if len(manifest) != step_count:
+        errors.append("audioManifest length does not match steps length")
+    for index, step in enumerate(payload.get("steps") or []):
+        if index >= len(manifest):
+            break
+        entry = manifest[index]
+        if entry.get("index") != index or entry.get("step") != step:
+            errors.append(f"audioManifest step {index + 1} is not aligned")
+            break
+    if errors:
+        raise ValueError("; ".join(errors))
+
+
 def build_html(recipe, payload):
+    validate_recipe_payload(payload)
     with open(TPATH, encoding="utf-8") as handle:
         raw = handle.read()
-    step_audio_json = json.dumps(payload.get("stepAudio", []), ensure_ascii=False).replace("</", "<\\/")
+    if "__RECIPE_JSON__" not in raw:
+        raise ValueError("recipe template is missing __RECIPE_JSON__ placeholder")
     recipe_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-    html = raw.replace("__STEPAUDIO__", step_audio_json).replace("__RECIPE_JSON__", recipe_json)
+    html = raw.replace("__RECIPE_JSON__", recipe_json)
+    if "__STEPAUDIO__" in html:
+        raise ValueError("recipe template still contains stale __STEPAUDIO__ placeholder")
+    if "__RECIPE_JSON__" in html:
+        raise ValueError("recipe template still contains __RECIPE_JSON__ placeholder")
     print(f"   [OK]  {recipe['name']} - {len(recipe['steps'])} steps, {len(recipe['ingredients'])} ingredients")
     return html
 
@@ -346,6 +472,9 @@ def load_recipe_from_args(args):
             "time": args.time,
             "servings": args.servings,
         }
+    meal_plan_recipe = fetch_meal_plan_recipe()
+    if meal_plan_recipe:
+        return meal_plan_recipe
     title, description = fetch_todoist()
     if not title:
         print("ERROR: No recipe found for today.")
@@ -364,6 +493,8 @@ def main():
     parser.add_argument("--servings", default="4 servings")
     parser.add_argument("--json", default="", help="Load recipe from JSON file")
     parser.add_argument("--deploy-only", action="store_true")
+    parser.add_argument("--build-only", action="store_true", help="Build /tmp/daily-recipe/index.html and stop before deploy/cast")
+    parser.add_argument("--no-audio", action="store_true", help="Skip TTS generation and build with empty audio slots")
     args = parser.parse_args()
 
     recipe = load_recipe_from_args(args)
@@ -375,6 +506,7 @@ def main():
         print(f"SKIP: {recipe['name']} — restaurant/meal out, no recipe to cast.")
         sys.exit(0)
 
+    recipe["steps"] = [str(step).strip() for step in recipe["steps"] if str(step).strip()]
     step_count = len(recipe["steps"])
     if step_count == 0:
         print("ERROR: Recipe has no steps.")
@@ -383,11 +515,15 @@ def main():
     print(f"\n{'=' * 50}\n  {recipe['name']}\n{'=' * 50}\n  {step_count} steps  |  {len(recipe['ingredients'])} ingredients\n")
 
     audio_data = []
-    if args.deploy_only:
+    if args.no_audio:
+        audio_data = normalize_audio_list([], step_count)
+        print("AUDIO: Skipped")
+    elif args.deploy_only:
         audio_data = load_existing_audio(step_count)
         if audio_data:
             print(f"AUDIO: Reusing {len(audio_data)} existing step files")
         else:
+            audio_data = normalize_audio_list([], step_count)
             print("AUDIO: No existing step files found; deploying without audio")
     else:
         print("AUDIO: Generating...")
@@ -399,6 +535,13 @@ def main():
     os.makedirs(RDIR, exist_ok=True)
     with open(f"{RDIR}/index.html", "w", encoding="utf-8") as handle:
         handle.write(html)
+    with open(f"{RDIR}/recipe-payload.json", "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2)
+
+    if args.build_only:
+        print(f"\nBUILD: Wrote {RDIR}/index.html")
+        print(f"PAYLOAD: Wrote {RDIR}/recipe-payload.json")
+        return
 
     print("\nDEPLOY: Netlify (fresh site)...")
     url = deploy(html)

@@ -69,6 +69,7 @@
 ## Progress Log
 
 ### 2026-05-17
+- Hardened kitchen recipe card generation/display: `scripts/daily-recipe.py` now emits one validated schema-v2 recipe payload with aligned `audioManifest`, build-only/no-audio verification flags, and `/tmp/daily-recipe/recipe-payload.json`; `skills/google-home-visual/interactive-recipe-card.html` now reads audio from that payload instead of stale standalone `__STEPAUDIO__` wiring.
 - Created new `skills/sermon-audio/` skill graph with `SKILL.md`, `MOC.md`, `plan.md`, `run.md`, and `review.md`.
 - Built `scripts/sermon_audio_extract.py` to probe service audio, detect speech-heavy candidate windows, optionally transcribe candidates with local `whisper`, score likely sermon sections, cut the chosen span, and normalize final output with ffmpeg loudness tools.
 - Verified CLI help and Python syntax. Pending real-file validation and heuristic tuning once Chris drops the church WAV.
