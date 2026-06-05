@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 daily-recipe.py - Build, deploy, and cast tonight's recipe card.
 """
 import argparse
-import base64
 import json
 import os
 import re
@@ -26,6 +25,77 @@ TODAY = TODAY_OBJ.strftime("%Y-%m-%d")
 TODAY_MONTH_DAY = TODAY_OBJ.strftime("%b %d")
 DINNER_PROJECT_IDS = {"2328094641", "6fwwjRCMPhWF76mR"}
 RECIPE_PAYLOAD_SCHEMA = 2
+
+
+# Prefixes we treat as decoration on a list item (markdown bullets, unicode bullets, dashes, asterisks).
+# Numbered prefixes (1. / 1) / 1:) are handled separately by split_list_arg.
+_LIST_PREFIX_RE = re.compile(r"^\s*(?:[-*•–—]+\s+|>\s+|\(\s*[a-z]\s*\)\s+)")
+
+
+def split_list_arg(value):
+    """Robustly split a CLI list argument into individual items.
+
+    Handles all the formats a human or an LLM might pass:
+      - newline-separated   ("step 1\\nstep 2")
+      - pipe-separated      ("step 1 | step 2")
+      - markdown bullets    ("- step 1\\n- step 2", "* step 1", "• step 1")
+      - numbered prefixes   ("1. step 1\\n2. step 2", "1) step 1")
+      - JSON array string   ('["step 1", "step 2"]')
+
+    Returns a list of clean strings. Empty / None input returns [].
+    """
+    if not value:
+        return []
+    text = str(value).strip()
+    if not text:
+        return []
+
+    # If the LLM passed a JSON array, parse it directly.
+    if text.startswith("[") and text.endswith("]"):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except json.JSONDecodeError:
+            pass  # fall through to delimiter-based splitting
+
+    # Normalize: turn pipes / semicolons into newlines, then split.
+    # We don't replace newlines with pipes, because newlines are the canonical
+    # format and the LLM is more reliable at producing " " around | than at
+    # producing \n inside shell-quoted args.
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = re.sub(r"\s*\|\s*", "\n", normalized)
+    normalized = re.sub(r"\s*;\s*", "\n", normalized)
+
+    items = []
+    for raw_line in normalized.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            continue
+        # Strip markdown / unicode bullet prefixes.
+        line = _LIST_PREFIX_RE.sub("", line)
+        # Strip numbered prefixes:  "1. ", "1) ", "1: ", "1 - "
+        line = re.sub(r"^\s*\d+[\.\)\:\-]\s+", "", line)
+        line = line.strip()
+        if line:
+            items.append(line)
+    return items
+
+
+def parse_ingredient_line(line):
+    """Parse a single ingredient line into {amount, item}.
+
+    Supports "amount:item" (canonical) and free-form lines (no colon — whole
+    line goes into item). Strips any leading bullet/number decoration.
+    """
+    cleaned = _LIST_PREFIX_RE.sub("", line)
+    cleaned = re.sub(r"^\s*\d+[\.\)\:\-]\s+", "", cleaned).strip()
+    if not cleaned:
+        return None
+    parts = [part.strip() for part in cleaned.split(":", 1)]
+    if len(parts) == 2 and parts[0] and parts[1]:
+        return {"amount": parts[0], "item": parts[1]}
+    return {"amount": "", "item": cleaned}
 
 
 def load_secret(name):
@@ -221,8 +291,7 @@ def gen_audio(steps):
                 env={**os.environ, "HOME": USER_HOME},
             )
             if result.returncode == 0 and os.path.exists(path):
-                with open(path, "rb") as f:
-                    audio_data.append("data:audio/mp3;base64," + base64.b64encode(f.read()).decode())
+                audio_data.append(f"audio/step-{index}.mp3")
                 print(f"   [OK]  Step {index + 1} audio")
             else:
                 audio_data.append("")
@@ -233,8 +302,8 @@ def gen_audio(steps):
     return audio_data
 
 
-def normalize_audio_list(audio_base64, step_count):
-    audio = list(audio_base64 or [])
+def normalize_audio_list(audio_sources, step_count):
+    audio = list(audio_sources or [])
     if len(audio) < step_count:
         audio.extend([""] * (step_count - len(audio)))
     elif len(audio) > step_count:
@@ -248,16 +317,15 @@ def load_existing_audio(step_count):
         path = f"{RDIR}/audio/step-{index}.mp3"
         if not os.path.exists(path):
             return []
-        with open(path, "rb") as f:
-            audio_data.append("data:audio/mp3;base64," + base64.b64encode(f.read()).decode())
+        audio_data.append(f"audio/step-{index}.mp3")
     return audio_data
 
 
-def build_recipe_payload(recipe, audio_base64=None):
+def build_recipe_payload(recipe, audio_sources=None):
     emoji, display_title = split_title(recipe["name"], recipe["emoji"])
     steps_strings = [str(step).strip() for step in recipe["steps"] if str(step).strip()]
     step_count = len(steps_strings)
-    audio = normalize_audio_list(audio_base64, step_count)
+    audio = normalize_audio_list(audio_sources, step_count)
     ingredients_flat = [
         [ing.get("amount", ""), ing.get("item", "")]
         for ing in recipe["ingredients"]
@@ -355,9 +423,9 @@ def deploy(html_content):
         audio_dir = os.path.join(RDIR, "audio")
         if os.path.isdir(audio_dir):
             shutil.copytree(audio_dir, os.path.join(tmpdir, "audio"), dirs_exist_ok=True)
-        # Always deploy to the dedicated recipe-card site
-        site_id = "519158f8-469e-4151-ae4e-bf35e3ef6ec6"
-        site_url = "https://stupendous-gnome-5797cf.netlify.app"
+        # Always deploy to the dedicated recipe-card site.
+        site_id = os.environ.get("RECIPE_NETLIFY_SITE_ID", "519158f8-469e-4151-ae4e-bf35e3ef6ec6")
+        site_url = os.environ.get("RECIPE_SITE_URL", "https://stupendous-gnome-5797cf.netlify.app")
         print(f"   [>>]  Deploying to {site_url}")
         env = {**os.environ, "HOME": USER_HOME}
         token = load_secret("NETLIFY_AUTH_TOKEN") or load_secret("NETLIFY_TOKEN")
@@ -373,8 +441,10 @@ def deploy(html_content):
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 def cast(url):
+    separator = "&" if "?" in url else "?"
+    cast_url = f"{url}{separator}v={datetime.now().strftime('%Y%m%d%H%M%S')}"
     result = subprocess.run(
-        ["python3", DCAST, url, os.environ.get("KITCHEN_DISPLAY", "Kitchen Display")],
+        ["uv", "run", "--with", "pychromecast", "python3", DCAST, cast_url, os.environ.get("KITCHEN_DISPLAY", "Kitchen Display")],
         capture_output=True, text=True, timeout=30,
         env={**os.environ, "HOME": USER_HOME},
     )
@@ -455,19 +525,15 @@ def load_recipe_from_args(args):
     if args.name:
         emoji_match = re.match(r"^\s*(\S)", args.name)
         ingredients = []
-        for line in args.ingredients.splitlines():
-            if not line.strip():
-                continue
-            parts = [part.strip() for part in line.split(":", 1)]
-            if len(parts) == 2:
-                ingredients.append({"amount": parts[0], "item": parts[1]})
-            else:
-                ingredients.append({"amount": "", "item": parts[0]})
+        for line in split_list_arg(args.ingredients):
+            parsed = parse_ingredient_line(line)
+            if parsed:
+                ingredients.append(parsed)
         return {
             "name": args.name,
             "emoji": emoji_match.group(1) if emoji_match else "🍽️",
             "ingredients": ingredients,
-            "steps": [step.strip() for step in args.steps.splitlines() if step.strip()],
+            "steps": split_list_arg(args.steps),
             "temp": args.temp,
             "time": args.time,
             "servings": args.servings,
@@ -486,8 +552,16 @@ def load_recipe_from_args(args):
 def main():
     parser = argparse.ArgumentParser(description="Build and cast tonight's recipe card")
     parser.add_argument("--name", default="")
-    parser.add_argument("--ingredients", default="")
-    parser.add_argument("--steps", default="")
+    parser.add_argument(
+        "--ingredients",
+        default="",
+        help="Ingredients list. Accepts newline-separated, pipe-separated ('a | b'), markdown bullets ('- a\\n- b' or '• a'), numbered prefixes ('1. a'), or JSON array ('[\"a\",\"b\"]'). Each line may be 'amount:item' or just 'item'.",
+    )
+    parser.add_argument(
+        "--steps",
+        default="",
+        help="Recipe steps. Accepts the same formats as --ingredients (newlines / pipes / bullets / numbers / JSON).",
+    )
     parser.add_argument("--temp", default="425°F")
     parser.add_argument("--time", default="45 min")
     parser.add_argument("--servings", default="4 servings")
