@@ -1,7 +1,8 @@
 ## OpenClaw Bootstrap Memory
 
 ### System
-- Host: `ccampos-Surface-Pro-6`
+- Host: `dobby-mac-mini.local` (Mac mini, macOS 26.2, ARM64)
+- Previous host was `ccampos-Surface-Pro-6` on Linux; do not assume Surface Pro/Linux paths or systemd behavior unless explicitly working with archived notes or remote legacy setup.
 - Timezone: `America/Chicago`
 - Primary agent: `main` (`Dobby`)
 - Other agents in active use: `forge`, `flaire`, `codex`
@@ -10,10 +11,14 @@
 - Gateway restart command: `openclaw gateway restart`
 
 ### Model Policy
-- Default text model: `minimax-portal/MiniMax-M2.7`
-- Active-memory model: `minimax-portal/MiniMax-M2.7-highspeed`
-- Codex is available as a first-class sub-agent via `sessions_spawn(agentId: "codex")`. Use it for coding tasks that benefit from GPT-5.5. Do NOT switch the main session model to Codex — keep MiniMax for all primary operations.
-- Cron jobs should run MiniMax-first.
+- **Default primary model:** `minimax-portal/MiniMax-M3` (verified live in `openclaw.json` 2026-06-04)
+- **Default fallback:** `openai/gpt-5.5`
+- **Cron policy (deliberate exception):** all `agentTurn` cron jobs now carry explicit `payload.model: "minimax-portal/MiniMax-M2.7"` — set 2026-06-04 after verifying GPT-5.5 compactions were failing. `systemEvent` cron jobs have no model field (they inject text into the main session, riding the main session's default).
+- **Compaction summarizer:** `minimax-portal/MiniMax-M2.7` (set in `agents.defaults.compaction.model`). Never use the session's primary model for summarization — `openai/gpt-5.5` summaries on Codex app-server have hit `Connection error`.
+- Do not use `MiniMax-M2.7-highspeed` as a default or fallback; the current coding plan does not include that tier.
+- Keep MiniMax on the supported OAuth `minimax-portal` path when fallback is needed; do not prefer direct API-key routing unless the user explicitly asks.
+- **Codex runtime:** canonical usage is `sessions_spawn(agentId="codex", task=..., taskName=...)`. **Do not trust sub-agent self-reports of runtime/model** — always verify with `session_status(sessionKey=<childKey>)`. Authoritative view shows `Runtime: OpenAI Codex` and `Model: openai/gpt-5.5`. Full reference: `memory/codex-runtime-invocation.md`.
+- `gpt-5.5` `thinking` level is path-specific: OpenClaw path only accepts `off`; Codex app-server path accepts `low`. `high` always fails on gpt-5.5.
 
 ### Gateway Rules
 - Use the smallest safe non-destructive repair first.
@@ -23,12 +28,19 @@
 - Browser-backed tasks can delay shutdown enough to trigger a forced systemd kill.
 
 ### Current Operational State
-- OpenClaw version expected on this host: `2026.4.26`
-- Main session should remain MiniMax-first.
-- Cron jobs should run MiniMax-first.
+- Current host is the Mac mini, not the Surface. Host identity: `dobby-mac-mini.local`, LAN `192.168.2.100`, Tailnet `100.89.254.87`.
+- The old Linux Surface OpenClaw and migrated auxiliary services are retired; do not restart Surface OpenClaw unless explicitly rolling back.
+- OpenClaw version expected on this host: `2026.5.18`
+- Main session default is `minimax-portal/MiniMax-M3` primary, `openai/gpt-5.5` fallback (per live `openclaw.json`).
 - `Telegram default` is known to be enabled but unconfigured.
 - mDNS/bonjour may disable itself noisily without implying gateway failure.
 - Telegram may fall back to sticky IPv4 on intermittent network issues.
+
+### Compaction (read before touching `agents.defaults.compaction`)
+- Configured (2026-06-04): `mode: default`, `reserveTokensFloor: 30000`, `model: minimax-portal/MiniMax-M2.7`, `truncateAfterCompaction: true`, `maxActiveTranscriptBytes: 20mb`, `keepRecentTokens: 8000`, `recentTurnsPreserve: 3`, `timeoutSeconds: 600`.
+- **`truncateAfterCompaction: true` is required to keep active transcripts from growing unbounded** — without it, JSONL files keep growing even after successful summarization, and the session eventually hits the context cap.
+- **Compaction fields are PROTECTED from `config.patch` and `config.apply`** — the gateway allowlist (`ALLOWED_GATEWAY_CONFIG_PATHS` in `dist/openclaw-tools-ChLzmhJi.js`) does not include any `compaction.*` paths. To change compaction, edit `~/.openclaw/openclaw.json` directly, then `openclaw gateway restart` (CLI LaunchAgent path — in-process restart coalesces and won't reload).
+- The "Something went wrong" wrapper error had three contributing factors, all addressed 2026-06-04: (1) over-context active Discord session — fixed by truncation, and user can `/new` to rotate immediately; (2) gpt-5.5 compaction `Connection error` — fixed by setting `compaction.model: M2.7`; (3) orphan `thinking: high` sub-agent on gpt-5.5 — gpt-5.5 only supports `off` (OpenClaw) / `low` (Codex app-server), so do not spawn with `high`.
 
 ### Key Paths
 - Workspace: `~/.openclaw/workspace`
@@ -41,7 +53,9 @@
 
 ### Durable User Context
 - User: Chris Campos
-- Family: Amanda, Franklin, Mae
+- Family: Amanda, Franklin (5, rising kindergarten), Mae (1)
+- **Franklin is DONE with school as of May 21, 2026** — summer plan active
+- Summer plan file: `data/franklin-summer-2026.md` — always cross-check when school is out
 - Work: Forge AHEAD Center / UAB communications
 - Primary outbound identity for assistant email: `clawdobby@gmail.com`
 - Google Workspace account for Chris operations: `chris.campos@gmail.com`
@@ -51,13 +65,32 @@
 - Telegram is configured for selected bots; one default account is intentionally not configured.
 - Todoist, Google Workspace, and Dropbox are active automation dependencies.
 - Nest/Google Home display workflows exist; see detailed memory files before changing device-specific behavior.
-- **Fire TV Signage:** Local dashboard server at `http://192.168.2.90:8888/` serves private dashboards over LAN. Skill: `skills/fire-tv-signage/`
+- **Peekaboo (macOS UI automation):** Installed at `brew install steipete/tap/peekaboo` (v3.2.3). Controls macOS windows, screenshots, clipboard, spaces. Use `--bridge-socket ~/Library/Application\ Support/OpenClaw/bridge.sock` always. Works alongside Chrome CDP — Peekaboo for macOS UI, CDP for web content. Reference: `memory/peekaboo-reference.md`
+- **Fire TV Signage:** Backend runs on the Mac mini at `http://192.168.2.100:3002`. Receiver project is `~/.openclaw/workspace/fire-tv-signage/receiver-android`. Current online receivers are `Living Room Google TV` and `Fire TV`. See `memory/2026-05-22-mac-mini-signage-migration.md` and `docs/openclaw-mac-mini-migration-session-lessons-2026-05-22.md` before changing signage, ADB, or receiver APKs.
+
+### Bee Live Capture — Durable Rules (Lane 0 cron `666809fb-...`)
+- **"Bee" is the Amazon Bee wearable device, not a person.** When Bee's own AI summary says "Bee said/did X" or "Bee was affectionate," translate to the actual human participant wearing the device (Chris, Amanda, or whoever is in the room). Never describe Bee as a person.
+- **Presence is fact, not a default.** Bee's AI summary often names "Amanda" as a participant when the actual context is Chris alone with a child, or Chris on a work call. Always verify presence from calendar + actual utterances before naming anyone. If you cannot determine who is present with high confidence, describe the situation without naming names. **Never default to Amanda just because Bee's summary mentions her.** Chris's exact rule (2026-06-05): "Don't name the person unless certain. In this case, I'm alone with Mae so it should not attribute to Amanda."
+- **Identity of the child is also fact, not a default.** Don't just verify an adult is present — verify *which child* is present. The 2026-06-05 12:08 CT milkshake conversation (conv 8498598) was logged to memory as "Chris + Mae" repeatedly, but the actual transcript had VBS markers ("To the Vobo BBS" = "Off to VBS"), "Mammy" (Amanda reference), Mickey Mouse, multi-word sentences, and milkshake prep — all 5-year-old Franklin context, not 1-year-old Mae context. Chris's exact correction: "I was discussing milkshakes with Franklin not Mae." **Match utterances to the kid's known speech patterns before naming.** **Franklin (5yo) markers**: VBS words ("Vobo BBS" = VBS, "kindergarten is next"), Mickey/Minnie, "Mammy"/"Daddy", multi-word sentences, "Mammy I'm going to get you some more food." **Mae (1yo) markers**: "May May", one-word snack requests ("num", "milk"), single repeated syllables. When in doubt, describe the child without naming them.
+- **Work-call participants are not "present"** — they are on the phone. Only the people physically in Chris's location count as present humans.
+- **"The last 30 minutes" really means the last 30 minutes of current activity.** Bee takes a long time to finalize conversations — a 1-hour work call that ended at 11:58 was still CAPTURING in Bee's metadata 50+ minutes later. The cron's `in_window()` used to pass CAPTURING convs unconditionally, which meant stale convs from hours ago got treated as "in the last 30 min" and surfaced false findings. **Fix in `bee-live-window.py` (effective 2026-06-05 12:48 CT)**: a CAPTURING conv now passes only if its latest `spoken_at` is within the last `2 * window_minutes` minutes (60 min for a 30-min window), OR it has no utterances yet AND its start_time is within the last `2 * window_minutes` minutes. Stale CAPTURING convs are excluded. This is the 12:31 cron-output bug Chris flagged.
+- **Bee's AI summary is INCOMPLETE — always do a raw-utterance pass.** Bee's summary routinely drops action items, shopping-list mentions, and quick reminders. The agent has been bitten: on 2026-06-05 Chris said "Did you remember that we need to buy ketchup from Walmart?" in a live capture, and the cron posted to Discord without surfacing it because Bee's summary only said "Speaker offers to make a milkshake at home." **Fix in Lane 0 prompt**: heartbeat must do a second pass on raw utterances scanning for "buy X / get X / need X / pick up X / out of X / X from [store] / remember to X / remind me to X / don't forget to X / gotta X / schedule X / tell X / message X / text X / email X / DM X". When the raw-utterance pass catches something not in Bee's summary, mark it "(raw-utterance pass — not in Bee's summary)" in the Discord message. Chris's exact rule: "I actually mentioned ketchup recently too intentionally to see if the Cron picked it up. So check again."
+- **The raw transcript is the source of truth; Bee's summary is corroboration only.** Chris's 2026-06-05 directive: "We shouldn't be relying on bee summary for the cron. We should be looking in the transcript." Two consecutive crons (runs 6 & 7) missed actionable items — ketchup and then mustard — because they anchored on Bee's summary. **Architecture flip**: `bee-live-window.py` now runs a pre-scan on the raw transcript and surfaces a `⚠️ ACTION-PHRASE SCAN` block at the top of each conversation's output. The cron's reading order is (1) action-phrase pre-scan, (2) acted-through-utterances dedup, (3) raw recent utterances for context, (4) Bee's summary for presence/atmosphere. Discord messages now include a "Triggered by: action-phrase scan | Bee summary | both" line and a "Verbatim: <exact utterance>" line so the audit trail shows what the cron actually acted on.
+- **CRITICAL: Lane 0 cron must dedup LIVE conversations.** A LIVE/CAPTURING conversation stays in the 30-min window for many consecutive cron runs (e.g., a 12:07 conv is in-window at 12:20, 12:40, 12:50, 1:00 PM). Without dedup, the same utterances are re-processed every 20 min → duplicate Todoist tasks, double-logged memory, repeated Discord pings. **Fix in `bee-live-window.py`**: state file at `~/.openclaw/workspace/state/bee-live-acted.json` tracks per-conv `acted_through_utterances`. Each output block shows `new since last action: <M>`; recent utterances section is sliced to NEW only. Auto-prunes tracked convs that fall out of the 30-min window so the same conv comes back fresh the next morning. **MANDATORY in cron prompt**: after any action, call `python3 ~/.openclaw/workspace/scripts/bee-live-window.py --mark-acted <conv_id> --through-utterances <N> --audit-summary "..." --audit-actions '[...]'`. Verified 2026-06-05 12:30 CT: run 9 returned `HEARTBEAT_OK` with no duplicates when both convs were already tracked.
+- **HEARTBEAT_OK is literally silent on Discord — not a Discord post that says "HEARTBEAT_OK"** (Chris's 2026-06-05 1:34 PM CT rule). The 1:28 PM CT cron run did the right thing algorithmically (ran dedup, found existing "Buy ketchup" task, did NOT create a duplicate) but called the `message` tool with content like `"HEARTBEAT_OK — ... the only actionable pre-scan hit is a duplicate ... No Discord ping needed."` — that is a real Discord post, NOT a heartbeat_ok. The whole point of HEARTBEAT_OK is that the gateway suppresses delivery. **Cron prompt now has a `# SILENT HEARTBEAT_OK — DEFINITION AND RULES` section** that: (1) bans phrases like "No Discord ping needed", "Already in Todoist, no action needed", "Silent on Discord", "Quiet run", "HEARTBEAT_OK — <explanation>", (2) explicitly says dedup catches → mark acted with `todoist_existing` audit type → return `HEARTBEAT_OK` as literal final message → DO NOT call the `message` tool, (3) reserved the `message` tool for new findings only (created/updated Todoist, memorable quote, point-worthy fact). Verified 2026-06-05 1:57 PM CT: dedup caught ketchup against existing `Buy ketchup` (id `6gpVHvCvh63c8Q9G`), audit log shows `kind: act` with `type: todoist_existing`, cron state shows `lastDelivered: False`, `DeliveryStatus: not-delivered` — channel stayed clean.
+- **First-person self-reminders from Chris are default-actionable** (Chris's 2026-06-05 14:10 CT correction). The 1:57 PM cron saw Chris say "I need to wash some more clothes" (utt #26, 13:40:16 CT, conv 8498598) and triaged it out as vague. Chris came back 17 min later confirming it was a real task. **Root cause:** cron prompt's triaging criteria were underspecified. **Fix in cron prompt (added 14:14 CT)**: a new `# TRIAGING RULES — WHEN TO ACT ON A HIT` section with two lists — **DEFAULT-ACTIONABLE** (speaker=Chris + need/remind/remember/gotta/schedule/book/add-to), **DEFAULT-NOT-ACTIONABLE** (tell-X / non-Chris gotta / non-grocery out-of / AI-summary-voice). **TRIAGED-OUT AUDIT — MANDATORY:** when agent decides NOT to act on a hit, log it as `{"type": "triaged", "utt_index": N, "pattern": "...", "reason": "..."}` so Chris can audit what was filtered. The audit's purpose is transparency, not just action-tracking. A quiet run that triaged 10 hits should still produce 10 audit records. Manual fix: Todoist task `6gpVwx4RR3GgV7V6` "Wash clothes" (Todo Items, P2, due today) created. **Lesson:** when the action-phrase scan surfaces a first-person self-reminder from the user, treat it as actionable by default — better to ask Chris "did you mean this as a todo?" than to silently drop it.
+- **Bias toward capture, not silence** (Chris's 2026-06-05 14:19 CT directive: "we need to make sure we aren't overlooking todo items. fix this behavior"). The cost of a missed task is real (Chris forgets, it bites him later); the cost of a false-positive Todoist task is one tap to delete. **5-part fix applied 14:25 CT**: (1) **Wider detection net** in `scripts/bee-live-window.py` ACTION_PATTERNS — added `I need/have/got/gotta/should/want to`, `I'm going to / gonna`, `I'll X`, `I should / I want to / I have to / I got to`, `we need to / we have to / we should`, `let's X` (excluding phatic), `reschedule`, `cancel X`, `set up a/an X`, `call X (named/known)`, `send X to`, `take X to`, `post/publish/ship`. (2) **`# BIAS TOWARD CAPTURE` section in cron prompt** — "when in doubt, create the task." (3) **`bee-capture` label on every Todoist task** the cron creates, filterable in Todoist. (4) **Daily 9:30 PM Bee Captures Review cron** — `id: 61723294-5f67-4397-a730-ad6e41171ccc`, schedule `30 21 * * *` America/Chicago, helper script `scripts/bee-captures-review.py --hours 24`, posts summary to #cron-notifications so Chris can verify captures and bulk-delete false positives. End-to-end verified 19:28 CT: 4 tasks surfaced, message id `1512538681876156439` delivered. (5) **Triaged-out audit** (already in cron prompt) — every triaged hit logs `{"type": "triaged", "utt_index": N, "pattern": "...", "reason": "..."}` so Chris can audit what was filtered. Audit log: `~/.openclaw/workspace/cron/bee-captures-review/YYYY-MM-DD/runs.jsonl` (kind: review). Backfilled `bee-capture` label on existing 4 legitimate captures; deleted 1 duplicate flyer task.
+- **Todoist label must be registered before use** (Chris's 2026-06-05 14:32 CT bug: "I don't see any of those tasks in Todoist"). Tasks had `"labels": ["bee-capture"]` in API responses, but `bee-capture` was NOT a registered personal label — only one label `morning` (id 2183673994) was registered. Fix: create the label via `POST /api/v1/labels {"name": "bee-capture", "color": "blue"}` BEFORE applying to tasks. Registered as id 2183976421. **Also**: Todoist web/mobile apps can take 5-10+ min to sync newly created tasks — Chris's "I don't see them" was at 2:29 PM and the most recent task (wash clothes) was created at 2:14 PM. Solution: always include direct Todoist URLs (`https://todoist.com/app/task/<id>`) in review messages and a footer note about refresh delays. Updated `bee-captures-review.py` to emit URLs and the refresh-delay hint.
+- **Lane 0 cron writes a local audit trail at `~/.openclaw/workspace/cron/bee-live-capture/YYYY-MM-DD/runs.jsonl`.** Independent of Discord's message store, so we can audit cron decisions even if Discord history is pruned. Records: `kind: saw` (every pull, what was in-window, how many new utt, tracked/untracked), `kind: act` (every action taken — Todoist id, memory line, Discord msg id), `kind: empty` (silent runs with no in-window convs). `saw`/`empty` are written automatically by the script; `act` is written when the cron calls `--mark-acted` with `--audit-summary` and `--audit-actions` flags. Format: one JSON object per line, sort_keys=true.
+- **Morning conversations are outside the 30-min window.** The cron's first run is ~11:53, by which time the 8:30 VBS drop-off conversation is 3+ hours old. The 30-min window misses the entire morning. **Open follow-up**: add a "Bee Morning Catch-up" run at ~09:00 that scans the last 3-4 hours, OR widen the first run of the day.
 
 ### Known Issues To Remember
 - `MEMORY.md` should stay compact; detailed history belongs in `memory/` files.
 - If Discord providers flap but recover on retry, treat that separately from gateway-down events.
 - If restart behavior is poor, inspect browser tasks and systemd stop timeout before assuming model failure.
 - If status surfaces disagree about MiniMax auth, check the live process environment before changing auth config.
+- **`openclaw cron edit --model` has a bug:** it errors with `cron.update payload.kind="agentTurn" requires message` even on `systemEvent` jobs that don't have a message field. The 5 `systemEvent` cron jobs in this workspace hit this — the bug is upstream; the jobs themselves don't need a model since they don't run an agent. For `agentTurn` jobs the bug doesn't fire.
+- **Gateway restart coalescing is real:** back-to-back `gateway restart` calls return `coalesced: true` and don't reload config. Use CLI `openclaw gateway restart` (LaunchAgent-driven) for a forced restart that bypasses the in-process coalescing window.
 
 ### Detailed References
 - Operational history and dated notes: `~/.openclaw/workspace/memory/`
@@ -65,62 +98,29 @@
 - Gateway summaries for handoff: `~/.openclaw/workspace/inbox/`
 - Session-specific state: `~/.openclaw/workspace/memory/session-context.json`
 
-## Promoted From Short-Term Memory (2026-05-05)
+## Archived Promoted Memory
 
-<!-- openclaw-memory-promotion:memory:memory/2026-04-27.md:1:4 -->
-- ### Franklin Pickup Reminder (13:50 CST) - Calendar event title is "Pick Up Franklin from School", not "pick up franklin" - Fixed match logic: now catches both "pick up franklin" and "pick up" + "franklin" in same title [score=0.957 recalls=4 avg=0.910 source=memory/2026-04-27.md:1-4]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:6:6 -->
-- **Problem:** User lookup failed with `ERR_MODULE_NOT_FOUND: Cannot find package '@vercel/kv'` [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:6-6]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:10:10 -->
-- **Files changed:** [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:10-10]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:16:16 -->
-- **Also fixed:** `_clubs.js` had a double `});)` syntax error introduced during edits. [score=0.862 recalls=0 avg=0.620 source=memory/2026-04-29.md:16-16]
+- Older promoted snippets from 2026-05-05 through 2026-05-20 were moved out of the bootstrap budget. Use dated files under `memory/` for historical details.
 
-## Promoted From Short-Term Memory (2026-05-06)
+## Promoted From Short-Term Memory (2026-06-05)
 
-<!-- openclaw-memory-promotion:memory:memory/2026-04-29.md:19:19 -->
-- **Problem:** Password reset API returned 200 but email never sent. Tested directly — 401 from Resend API. [score=0.882 recalls=0 avg=0.620 source=memory/2026-04-29.md:19-19]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:5:5 -->
-- Chris is open to Stripe Link as a future autonomous purchasing tool, with these guardrails: [score=0.860 recalls=0 avg=0.620 source=memory/2026-04-30.md:5-5]
-
-## Promoted From Short-Term Memory (2026-05-07)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:11:11 -->
-- **Use cases considered:** [score=0.879 recalls=0 avg=0.620 source=memory/2026-04-30.md:11-11]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-30.md:16:16 -->
-- **Status:** Deferred. Don't implement until a concrete use case arises where asking first is actually a blocker. Keep the idea in TOOLS.md. [score=0.873 recalls=0 avg=0.620 source=memory/2026-04-30.md:16:16]
-
-## Major Events This Week (2026-05-06 through 2026-05-08)
-
-### Amanda Claire's Job Crisis
-- Lost her job / received formal written warning at work this week
-- HR involvement, needs to write a personal improvement plan
-- Considering resigning from children's ministry at church (told Brandon)
-- Therapist recommended psychiatric evaluation at UAB's Center for Psychiatric Medicine — her current anxiety/depression medication is not working and she needs a medication adjustment/reevaluation. Rash is a secondary, minor issue.
-- Amanda's mother gave toxic advice: suggested she leave Chris, "document" things for custody
-- Amanda considering cutting off her mother; baby dedication Sunday may not involve Amanda's parents
-
-### Marriage Support
-- Chris had counseling session (May 8) — therapist validated his role as "peacekeeper" across multiple family systems
-- Chris opened up to his own mother about marital struggles — she responded supportively and offered to help them get away together
-- Next counseling session: June 26th at 10 AM
-- In-laws visiting this weekend for baby dedication (Amanda Claire felt obligated to say yes despite burden)
-
-### Franklin
-- Field Day May 8 — class won final Tug of War; teachers Miss Smitherman and Miss Carpenter
-- Parent-teacher conference: doing very well academically and socially
-- Teacher recommends separating Franklin from Henry/Harley for kindergarten
-- Strong literacy and math; needs practice writing last name
-- School plant needs repotting into larger container
-
-### Work (Jim Pop / UAB)
-- Jim Pop website nearing completion: finalized "Jim Pop Framework" naming, removed NIH-non-compliant language, updated CAB page
-- Moving newsletter to quarterly (was monthly); May newsletter needs review
-- Faculty retreat at Algen coming up (Thursday/Friday)
-
-## Promoted From Short-Term Memory (2026-05-10)
-
-<!-- openclaw-memory-promotion:memory:memory/2026-03-04.md:16:19 -->
-- **Summary:** - 📅 **Wed March 4** — Franklin has "Wacky Outfit or Wacky Hair Day" at school, plus full work day (Campus Communicators meeting 8-5, Forge AHEAD meeting at 10am, FAC Team at 11am), pickup at 2pm, Home Group at 6pm [score=0.881 recalls=3 avg=0.910 source=memory/2026-03-04.md:16-17]
-<!-- openclaw-memory-promotion:memory:memory/2026-04-23.md:11:14 -->
-- - Father-son return hike to complete overlook trail - Improving follow-through and quick repairs in relationships - ⚠️ October commitments were made but not fulfilled — pattern flag - Department history presentation — first version due **Saturday** [score=0.872 recalls=1 avg=0.672 source=memory/2026-04-23.md:11-14]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:10:10 -->
+- Prompt 17. What's in my memory that's outdated?: `memory/active-tasks.md` is materially stale. Its header still says `Last updated: 2026-03-31`, while the body contains newer May entries plus an expired RSVP monitor for Franklin's birthday party with an April 11 deadline. That means the file is still useful, but it is no longer trustworthy as a "read this first" control plane without cleanup. The outdated part is not a single fact about the household; it is the operational memory structure itself. [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:10-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:13:13 -->
+- Suggested Action for Prompt 17:: sed -n '1,260p' ~/.openclaw/workspace/memory/active-tasks.md [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:13-13]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:16:16 -->
+- Prompt 18. What should I have searched for instead?: Cron health was the main place where relying on memory would have been wrong. A quick direct check showed the current continuity cron is healthy and running with `model: minimax-portal/MiniMax-M2.7`, while the real active cron problem is a different job: `Nightly OpenClaw Self-Heal` is still in an error state from 2026-05-29 with `⚠️ 🛠️ Exec failed`. The other concrete lookup I should have done sooner was checking the shell environment for tooling availability instead of assuming `rg` existed. [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:16-16]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:19:19 -->
+- Suggested Action for Prompt 18:: openclaw cron get cf714c75-3709-4612-acb6-d44b832b8f2f [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:19-19]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:4:4 -->
+- Prompt 16. What did I learn today that I forgot to document?: Two practical environment lessons surfaced tonight. First, this automation shell does not have `rg`, so any search-heavy workflow that assumes ripgrep will fail and fall back to slower tools. Second, the continuity review depends on a fresh cron health snapshot; the cached file in `/tmp/cron_health_snapshot.json` had been left on yesterday's data until I refreshed it tonight. Both are the kind of small operational facts that should be explicit so future runs do not waste time rediscovering them. [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:4-4]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-30.md:7:7 -->
+- Suggested Action for Prompt 16:: python3 ~/.openclaw/workspace/skills/continuity-questions/cache_cron_health.py [score=0.883 recalls=0 avg=0.620 source=memory/2026-05-30.md:7-7]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-31.md:10:10 -->
+- Prompt 20. Am I aligned with the mission?: Mostly yes. The mission in `SOUL.md` is to keep Chris's life running smoothly by acting first on safe, reversible operations, and tonight's work matched that: I refreshed cron health, repaired broken monitoring scripts, restarted dashboard services, and avoided dumping another passive issue list. The drift is that some automation still stops at diagnosis. `Nightly OpenClaw Self-Heal` is healthy now, but the broader loop should close issues like stale cron state, dashboard health failures, and small script portability problems without waiting for a separate human-triggered pass. [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:10-10]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-31.md:13:13 -->
+- Suggested Action for Prompt 20:: bash ~/.openclaw/workspace/scripts/silent-dashboard-check.sh && bash ~/.openclaw/workspace/scripts/openclaw-compaction-failure-monitor.sh [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:13-13]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-31.md:16:16 -->
+- Prompt 21. What's Master Chris's biggest pain point right now?: The biggest pain point is reliability debt in the assistant itself: Chris has many useful automations, but recurring cron errors, stale diagnostic state, model-key drift, and platform assumptions mean he still has to wonder whether the system is quietly doing its job. Recent memory also points to active family/work support needs, especially Franklin's summer coverage, Bee action extraction, running intelligence, and UAB/LinkedIn monitoring, but those depend on the assistant being trustworthy first.... [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:16-16]
+<!-- openclaw-memory-promotion:memory:memory/2026-05-31.md:19:19 -->
+- Suggested Action for Prompt 21:: openclaw cron get e262c626-1feb-4ef3-8f74-e01f79c0549e && openclaw cron get 8de947b3-12f6-4c67-b510-46feb5b86459 [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:19-19]
