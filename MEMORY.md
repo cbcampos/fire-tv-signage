@@ -21,9 +21,10 @@
 - `gpt-5.5` `thinking` level is path-specific: OpenClaw path only accepts `off`; Codex app-server path accepts `low`. `high` always fails on gpt-5.5.
 
 ### Image Generation Default
-- **Default path: gpt-image-1.5 via Codex sub-agent on `openai/gpt-5.4`.** Significantly better than `minimax` for character consistency, text rendering (signs, labels, posters, brand names), product clarity, and aspect-ratio fidelity. Chris's 2026-06-05 directive: "GPT image gen is MUCH BETTER."
+- **Default path: gpt-image-2 (the model the Codex desktop app uses) via Codex sub-agent on `openai/gpt-5.4`.** Significantly better than `minimax` for character consistency, text rendering (signs, labels, posters, brand names), product clarity, and aspect-ratio fidelity. Chris's 2026-06-05 directive: "GPT image gen is MUCH BETTER."
+- **ALWAYS use the Codex sub-agent path. Never the direct `image_generate` tool with `model=openai/gpt-image-*`.** The direct tool hits the public OpenAI Responses API, which requires an OAuth token with `api.responses.write` scope. Our `auth-profiles.json` token only has `["openid", "profile", "email", "offline_access"]` — it 401s with `Missing scopes: api.responses.write`. The Codex sub-agent goes through the Codex app-server's internal endpoint, which the same OAuth token *can* use (verified working in the Codex desktop app).
 - **Required model override:** Codex sub-agents for image gen must use `model="openai/gpt-5.4"`. `gpt-5.5` on the Codex app-server path does **not** register the `image_gen` tool — spawns fail with "Tool result missing due to internal error". Use `gpt-5.5` for non-image Codex work.
-- **Spawn pattern:** `sessions_spawn(agentId="codex", task="Generate with the `imagegen` skill, gpt-image-1.5, <size>, <background>. Subject: <…>. Text to render (exact): <…>. Save to ~/.openclaw/workspace/state/agent-image-gen/<name>.png. Return absolute path.", taskName="<handle>", model="openai/gpt-5.4")`. Sub-agent inherits the workspace and can write to the agent-image-gen dir.
+- **Spawn pattern:** `sessions_spawn(agentId="codex", task="Generate with the `imagegen` skill, gpt-image-2, <size>, <background>. Subject: <…>. Text to render (exact): <…>. Save to ~/.openclaw/workspace/state/agent-image-gen/<name>.png. Return absolute path.", taskName="<handle>", model="openai/gpt-5.4")`. Sub-agent inherits the workspace and can write to the agent-image-gen dir.
 - **Style for Chris:** paste the relevant paragraph from `memory/image-style-guide.md` (hand-drawn paper craft) into the sub-agent task when that's the style. Other styles work too — just specify.
 - **Default aspect:** `1024x1024` for general, `1536x1024` for 3:2 landscape, `1024x1536` for 2:3 portrait/poster, `auto` if caller doesn't care.
 - **Full skill proposal:** `gpt-image-gen` (pending, created 2026-06-05). Workshop is the canonical path for skill lifecycle.
@@ -148,3 +149,7 @@
 - **Fix:** `scripts/bee-cron-fallback-watchdog.py` (every 5 min, cron `63b92857-e685-4396-9baa-d28a3d6621a4`) detects the signature and re-triggers broken runs. Alerts at 3+ consecutive failed retries.
 - **Caveat:** Watchdog is a symptom fix, not a root-cause fix. The real bug is at `api.minimax.io/anthropic/v1`. If empty-response rate increases, switch the Bee cron to M3 or the Codex app-server path.
 - **Don't trust cron output alone — always cross-check `usage.input_tokens` against expected range.** A sub-5K-input run on a model that should use 30K is the empty-fallback signature.
+
+## Shopping Items — No Due Date (2026-06-05 16:23)
+- **Rule:** When the Bee cron creates a Todoist task in the Shopping project (`6Crfx7wRcx657GMp`), it MUST NOT include a due date. Just the item content + project_id + `bee-capture` label. Chris's rule: "Shopping items don't need a due date."
+- **Cleanup rule:** If you find a Shopping task with a stale due date, clear it via `POST /api/v1/tasks/<id>` with body `{"due_string": "no date"}`.
