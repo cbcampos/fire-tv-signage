@@ -153,3 +153,8 @@
 ## Shopping Items — No Due Date (2026-06-05 16:23)
 - **Rule:** When the Bee cron creates a Todoist task in the Shopping project (`6Crfx7wRcx657GMp`), it MUST NOT include a due date. Just the item content + project_id + `bee-capture` label. Chris's rule: "Shopping items don't need a due date."
 - **Cleanup rule:** If you find a Shopping task with a stale due date, clear it via `POST /api/v1/tasks/<id>` with body `{"due_string": "no date"}`.
+
+## Telegram Cron Audit — Always Grep for Stragglers (2026-06-05)
+- **Rule:** After any cron routing audit or migration, run `openclaw cron list 2>&1 | grep -i telegram` as the final check. A "comprehensive" audit on 2026-06-05 missed two Telegram crons (Daily Recipe Cast, Weekly Bee Action Report) until Chris got a routing-leakage failure alert 6+ hours later.
+- **Current state (verified 2026-06-05 16:38 CT):** Zero Telegram-routed cron jobs. All cron notifications go to Discord #cron-notifications (`1470900732931735697`).
+- **Failure-alert pattern:** When fixing a Telegram cron, also add an explicit `failureAlert` block (`--failure-alert --failure-alert-after 1 --failure-alert-channel discord --failure-alert-to 1470900732931735697 --failure-alert-mode announce`). Without it, timeouts fall back to the agent's main notification path which can leak to Telegram.
