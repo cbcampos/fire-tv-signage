@@ -20,6 +20,14 @@
 - **Codex runtime:** canonical usage is `sessions_spawn(agentId="codex", task=..., taskName=...)`. **Do not trust sub-agent self-reports of runtime/model** — always verify with `session_status(sessionKey=<childKey>)`. Authoritative view shows `Runtime: OpenAI Codex` and `Model: openai/gpt-5.5`. Full reference: `memory/codex-runtime-invocation.md`.
 - `gpt-5.5` `thinking` level is path-specific: OpenClaw path only accepts `off`; Codex app-server path accepts `low`. `high` always fails on gpt-5.5.
 
+### Image Generation Default
+- **Default path: gpt-image-1.5 via Codex sub-agent on `openai/gpt-5.4`.** Significantly better than `minimax` for character consistency, text rendering (signs, labels, posters, brand names), product clarity, and aspect-ratio fidelity. Chris's 2026-06-05 directive: "GPT image gen is MUCH BETTER."
+- **Required model override:** Codex sub-agents for image gen must use `model="openai/gpt-5.4"`. `gpt-5.5` on the Codex app-server path does **not** register the `image_gen` tool — spawns fail with "Tool result missing due to internal error". Use `gpt-5.5` for non-image Codex work.
+- **Spawn pattern:** `sessions_spawn(agentId="codex", task="Generate with the `imagegen` skill, gpt-image-1.5, <size>, <background>. Subject: <…>. Text to render (exact): <…>. Save to ~/.openclaw/workspace/state/agent-image-gen/<name>.png. Return absolute path.", taskName="<handle>", model="openai/gpt-5.4")`. Sub-agent inherits the workspace and can write to the agent-image-gen dir.
+- **Style for Chris:** paste the relevant paragraph from `memory/image-style-guide.md` (hand-drawn paper craft) into the sub-agent task when that's the style. Other styles work too — just specify.
+- **Default aspect:** `1024x1024` for general, `1536x1024` for 3:2 landscape, `1024x1536` for 2:3 portrait/poster, `auto` if caller doesn't care.
+- **Full skill proposal:** `gpt-image-gen` (pending, created 2026-06-05). Workshop is the canonical path for skill lifecycle.
+
 ### Gateway Rules
 - Use the smallest safe non-destructive repair first.
 - Never weaken auth, expose secrets, or relax access policy.
@@ -133,3 +141,10 @@
 - Prompt 21. What's Master Chris's biggest pain point right now?: The biggest pain point is reliability debt in the assistant itself: Chris has many useful automations, but recurring cron errors, stale diagnostic state, model-key drift, and platform assumptions mean he still has to wonder whether the system is quietly doing its job. Recent memory also points to active family/work support needs, especially Franklin's summer coverage, Bee action extraction, running intelligence, and UAB/LinkedIn monitoring, but those depend on the assistant being trustworthy first.... [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:16-16]
 <!-- openclaw-memory-promotion:memory:memory/2026-05-31.md:19:19 -->
 - Suggested Action for Prompt 21:: openclaw cron get e262c626-1feb-4ef3-8f74-e01f79c0549e && openclaw cron get 8de947b3-12f6-4c67-b510-46feb5b86459 [score=0.865 recalls=0 avg=0.620 source=memory/2026-05-31.md:19-19]
+
+## M2.7 Empty-Response Silent Fallback (2026-06-05)
+- **Bug:** M2.7 on `minimax-portal` (provider `anthropic-messages`) intermittently returns 200 OK with `content: []` and 0 tokens used. Gateway's empty-content handler silently falls back to `gpt-5.5` (cold start, no prompt context), which emits 9 tokens of nothing and exits. The cron looks "ok" but does no work.
+- **Signature in runs log:** `model: "gpt-5.5"` + `provider: "openai"` + `input_tokens < 5000` + `summary: "HEARTBEAT_OK"` + `runId` does NOT start with `manual:`. Healthy M2.7 runs: `provider: "minimax-portal"`, `input_tokens` 28-35K.
+- **Fix:** `scripts/bee-cron-fallback-watchdog.py` (every 5 min, cron `63b92857-e685-4396-9baa-d28a3d6621a4`) detects the signature and re-triggers broken runs. Alerts at 3+ consecutive failed retries.
+- **Caveat:** Watchdog is a symptom fix, not a root-cause fix. The real bug is at `api.minimax.io/anthropic/v1`. If empty-response rate increases, switch the Bee cron to M3 or the Codex app-server path.
+- **Don't trust cron output alone — always cross-check `usage.input_tokens` against expected range.** A sub-5K-input run on a model that should use 30K is the empty-fallback signature.
