@@ -16,6 +16,16 @@ from pathlib import Path
 TODOIST_TOKEN_PATH = Path.home() / ".openclaw/.secrets/todoist.env"
 CENTRAL = timezone(timedelta(hours=-5))  # America/Chicago (no DST in this season; adjust if needed)
 
+# Project name lookup (verified 2026-06-05 14:48 CT for Chris's account, user 4293454)
+PROJECT_NAMES = {
+    "6Crfx7wRcx657GMp": "Shopping",
+    "6g3jcC2JG5PcG3j6": "Todo Items",
+    "6Crfx7wRc3c2fQWC": "Inbox",
+    "6fwwfHvqPCFv58Xj": "Family",
+    "6fwwjRCMPhWF76mR": "Dinner",
+    "6Crfx7wRcjc9wCpw": "Bookmarks",
+}
+
 
 def load_token() -> str:
     if not TODOIST_TOKEN_PATH.exists():
@@ -95,13 +105,14 @@ def main() -> int:
         due = t.get("due") or {}
         due_str = due.get("date", "no due date") if isinstance(due, dict) else "no due date"
         project_id = t.get("project_id", "?")
+        project_name = PROJECT_NAMES.get(project_id, f"unknown({project_id})")
         # Direct task URL — Todoist web app uses /app/task/<id>
         url = f"https://todoist.com/app/task/{tid}"
         # API priority values are inverted vs UI: API 4 = UI P1 (urgent), API 1 = UI P4 (no priority)
         priority_label = {1: "P4", 2: "P3", 3: "P2", 4: "P1"}.get(priority, "P?")
         completed = t.get("checked", False) or t.get("completed_at")
         status = " ✓ completed" if completed else ""
-        print(f"- **[{added}] {content}** (`{tid}`) — {priority_label}, due {due_str}{status} — <{url}>")
+        print(f"- **[{added}] {content}** (`{tid}`) — {priority_label}, {project_name}, due {due_str}{status} — <{url}>")
     print()
     print(f"_Tasks are labeled `bee-capture`. To bulk-delete false positives: Todoist → filter by label → multi-select → delete. If a task is missing, refresh the Todoist app — newly created tasks can take ~5-10 min to sync to mobile/web._")
 
