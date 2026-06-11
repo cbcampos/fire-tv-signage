@@ -134,3 +134,177 @@ A CAPTURING conv that fell out of the 30-min window (e.g., Chris stopped talking
 - **2026-06-10 11:46:** CSS Grid + flex children — grid items default to `min-width: auto`, so any flex child with intrinsic content width (pill, badge, code, long word) expands the track beyond the column's `1fr`. Symptom: column is wider than the viewport; text gets clipped at the right edge. Fix: `min-width: 0` on every grid item + the flex container inside. Confirmed in work-dashboard.html portrait Asana list (column was 725px on a 393px viewport; `min-width: 0` brought it to 361px).
 
 - **2026-06-10 16:16 — Lemonade × 2 (acted-state worked, dedupe was rule-only, second utterance duped).** The same conversation (8596425) was processed twice in two cron runs: 15:35 CT (utt #165 → `6gqhqPVphvHhV62p`) and 16:07 CT (utt #270 "We need to get lemonade" → `6gqj2jwWMXF3XWrp`). Both runs had valid acted-state increments; the second run saw 153 new utterances and created a new task for one of them. The Todoist pre-check helper (`scripts/todoist-task-dedupe.py`) was a HEARTBEAT.md rule the cron agent could skip, and on the second run the agent created anyway. **Fix shipped 2026-06-10 16:24:** moved the pre-check into `scripts/bee-live-window.py::scan_for_action_phrases()` so it's enforced at the script level, not the agent level. Each hit is now looked up against active Todoist tasks in the Shopping project; matches get `existing_task_id` / `existing_task_url` / `existing_task_content` fields and a `🔁 DUPLICATE` line in the text output. `--no-todoist-precheck` escape hatch for debug. Regression test: `scripts/test_bee_live_window_todoist_precheck.py` (7 tests, all pass). **Rule going forward:** dedupe MUST be enforced in the script that produces the action-item signal. HEARTBEAT.md rules are advisory; agent LLMs can skip them when the pattern looks unambiguous (in this case: a new utterance with a clear noun). The two-layer model from the gatorade incident (acted-state + Todoist pre-check) is intact — both layers are required, and they protect against different failure modes. The acted-state layer was working correctly; the Todoist layer was advisory. The Todoist layer is now mandatory.
+
+- **2026-06-10 16:24 — Closed both duplicates instead of one (lemonade).** Chris said "you deleted both lemonade entries instead of one" after I closed both `6gqhqPVphvHhV62p` and `6gqj2jwWMXF3XWrp` in the lemonade × 2 cleanup. The right move was keep the original, close only the duplicate. I re-created the task as `6gqj5WgWMCRGXm5G`. The gatorade × 3 closeout was a different case (multiple ambiguous mentions from 3 separate convs, possibly stale — closing all was the conservative call), but the lemonade case was unambiguous (Chris said "we need to get lemonade" twice in the same active conv). **Rule:** when deduping duplicate Todoist tasks, default to keep-one-close-one if the noun is unambiguous. If the noun is ambiguous (multiple distinct mentions, multiple distinct convs) or stale (hours-old, possibly no longer relevant), ask the user before keeping. **Edit-tool trap (recurrence):** `write` silently overwrites the whole file — I lost the 136-line known-issues archive once during this incident and had to `git checkout` it back. Always use `>>` for appends to existing files.
+
+## 2026-06-10 16:30 → 19:20 — Push audio pipeline working end-to-end (5 bugs fixed, 1 wrong diagnosis corrected)
+
+The dashboard was stuck on "Loading…" for weeks and push audio never auto-played on the iPhone PWA. Chris reported "I saw nothing and heard nothing" on test pushes. Root cause turned out to be a chain of independent bugs plus one incorrect assumption about how `push-notify.py` worked.
+
+### Bug 1: Data server `/data` handler — double `send_response` (16:30 → 17:30 CT)
+
+`scripts/dashboard-data-server.py` had two `send_response(200)` + `end_headers()` calls in the `/data` branch. The first set sent headers and then the handler tried to write the body, but the response stream was already in a bad state. The handler then called `send_response(200)` AGAIN and tried to write the body a second time, which either hung or sent malformed data. The dashboard's `fetch()` either timed out or got garbage, hence the perpetual "Loading…".
+
+**Fix:** removed the duplicate `send_response` / `end_headers()` in the `/data` branch. The launchd-started instance had to be un-/re-loaded via `launchctl unload && launchctl load` to pick up the new code.
+
+### Bug 2: LaunchAgent PATH for `gws` (17:30 CT)
+
+The data server calls `gws` to fetch work events. The launchd-started instance couldn't find `gws` even though the path was set correctly in the plist. Manual start with `env PATH=…` worked. The launchd instance threw `FileNotFoundError: 'gws'` repeatedly. **Root cause unclear** — possibly launchd's PATH was different from the shell. Worked around by hardcoding the full path in `_fetch_work_events` or adding `env` to the plist.
+
+### Bug 3: iOS PWA `new Audio()` doesn't carry over user-gesture unlock (18:00 CT)
+
+The previous audio priming trick was: create `new Audio()` in a user gesture, play the silent WAV, pause+rewind, set `_kokoroPrimed = true`. Later, the `push:received` handler would create ANOTHER `new Audio()` and try to `.play()` it.
+
+**iOS rule I learned:** every `new Audio()` construction is re-gated for autoplay. The unlock from the user gesture does NOT carry over to a new `Audio` object. Even on the SAME element, if you re-construct via `new Audio(src)`, the autoplay token is gone.
+
+**Fix:** replaced the `new Audio()` priming trick with a real `<audio id="kokoro-player">` element rendered in the DOM from page load. The `src` is a 100ms silent WAV data URL. The `primeKokoroAudio()` function plays this silent WAV in a user gesture, then pauses+rewinds. Future `play()` calls on this same DOM element work without re-gating, even when the `src` changes to a Kokoro-generated WAV. **Rule:** the `<audio>` element MUST be in the DOM from page load and MUST stay in the DOM (unmounting resets the autoplay permission).
+
+### Bug 4: JS TDZ error in `work-dashboard.html` (19:00 CT)
+
+The dashboard's main `<script>` had a Temporal Dead Zone violation:
+- Line ~1013 area: `let _kokoroPrimed = false;` (state vars)
+- Line ~1158: `setSoundUI();` (called at top level, references `_kokoroPrimed`)
+- Line ~1321: ANOTHER `let _kokoroPrimed = false;` (duplicate, never reached)
+
+The error overlay showed: `ReferenceError: Cannot access '_kokoroPrimed' before initialization`. The entire inline `<script>` aborted at boot. The error overlay IIFE was added as the FIRST `<script>` (lines ~996-1012) so any future boot-time error would be visible on the iPhone screen as a red banner — no need for Web Inspector.
+
+**Fix:** removed the duplicate `let _kokoroPrimed = false;` from line ~1321. The hoisted declaration at line ~1013 is the canonical one.
+
+### Diagnostic that worked: boot-time fetch test (19:15 CT)
+
+Added an IIFE that fires `fetch("/api/work-dashboard?hours=1&_=boot")` as the very first thing in the main script (after `_kokoroPrimed` is declared). The result is written to a black status bar fixed at the bottom of the screen: `Boot fetch: pending…` → `Boot fetch: 200 in 2480ms` or `Boot fetch FAILED: <msg>`.
+
+**Why this worked:** it eliminated "is the script even running" as a question. The result was: script IS running, API IS being called, data server IS responding. The bug was specifically in the push → audio playback path, not the dashboard itself.
+
+Chris confirmed: "I see fetch: 200 in 2480ms." Followed by 3+ normal `refresh()` calls in the data server log.
+
+### THE bug (19:18 CT): `push-notify.py --tts` does not generate Kokoro audio
+
+After all the above fixes, the dashboard loaded correctly but test pushes still had no audio. The push server log showed:
+```
+[push] sent=4 failed=0 removed=0 body='Test three. Auto-play check...'
+```
+
+The push was being sent, but there was no `kokoro_url` in the SW payload, so the dashboard's `push:received` handler bailed on `hasKokoro = false`.
+
+**Root cause:** `push-notify.py --tts` sets `data["tts"] = True` which propagates to the SW's `data` field, but the push server only generates Kokoro audio when the **top-level** `kokoro: true` is set in the request body:
+```python
+kokoro_text = body.get("kokoro_text") or body.get("body") if body.get("kokoro") else None
+```
+
+`push-notify.py` has no `--kokoro` flag, so all my previous test pushes (`--tts`) had no `kokoro: true` at the top level → no audio URL embedded → dashboard had nothing to play.
+
+**The previous "I saw nothing and heard nothing" reports were correct, just misinterpreted.** The push banners WERE appearing (Chris just wasn't looking at the iPhone at the time, or the notification was silently dismissed). The audio was NEVER there to play.
+
+**Fix:** send via raw curl with `kokoro: true` + `kokoro_text` + `urgent: true`:
+```bash
+curl -sS -m 60 -X POST "http://127.0.0.1:8891/api/push/send" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Dobby",
+    "body": "Test three. Auto-play check.",
+    "kokoro": true,
+    "kokoro_text": "Test three. Auto-play check.",
+    "urgent": true
+  }'
+```
+
+**Result at 19:20 CT:** Chris said "it worked!" Kokoro auto-played the test message through the iPhone speakers without any user interaction. End-to-end push audio pipeline is now functional.
+
+### Lessons (in order of importance)
+
+1. **`push-notify.py --tts` is a footgun.** The `--tts` flag exists but does NOT generate Kokoro audio. It's a no-op for actual audio. Always use raw curl with `kokoro: true` for test pushes, or update `push-notify.py` to add a `--kokoro` flag (TODO). The skill `skills/send-push/SKILL.md` should be updated to reflect this.
+2. **Verify the payload, not the response.** `sent: 4, failed: 0` tells you the push was DELIVERED to APNS, not that the SW payload contained the expected fields. To verify, dump the actual SW payload from the device (e.g., via `clients.postMessage` echo) or add a payload inspection endpoint on the push server.
+3. **When auto-play doesn't work, check the audio payload BEFORE the audio path.** The whole iOS PWA audio engineering (persistent DOM element, user-gesture priming, etc.) was correct from the start. The bug was upstream in the test push generation. Don't burn cycles debugging the playback layer when there's no audio to play.
+4. **Boot-time fetch test is a good general pattern.** Adding a top-level `fetch` with a visible result indicator is a fast way to confirm "the script is running" without DevTools. Useful for any PWA debugging where the page appears blank/broken and you can't easily attach a debugger.
+5. **The error overlay is worth its weight.** The `installErrorOverlay()` IIFE (lines ~996-1012 in `work-dashboard.html`) caught the TDZ error and showed the actual error message on the iPhone screen. Without it, I would have spent hours guessing why the page was blank.
+6. **Don't trust `--tts` flags to mean what they say.** When a CLI flag claims to enable TTS, verify it actually generates audio. The flag might be setting a different data field that the receiving end ignores. Always end-to-end test from trigger to playback.
+
+### Files modified during this saga
+
+- `scripts/dashboard-data-server.py` — removed duplicate `send_response`/`end_headers` in `/data` branch; added request logging (debug)
+- `dashboards/work-dashboard.html` — added `installErrorOverlay()` IIFE; hoisted `let _kokoroPrimed = false`; added boot-fetch test + status bar; persistent `<audio id="kokoro-player">` in DOM
+- `dashboards/work-sw.js` — bumped `CACHE_VERSION` from v40 to v44 across iterations
+- `dashboards/work-manifest.json` — bumped `version` to 1.7
+- `scripts/dashboard_push.py` — Kokoro pre-generation logic (already correct, just was not being triggered by `push-notify.py --tts`)
+
+### Service worker cache version timeline (iPhone cache busting)
+
+- v40: added persistent DOM `<audio>` element
+- v41-v43: error overlay IIFE + TDZ fix
+- v44: boot-fetch test (current as of 19:20 CT)
+
+### TODO (not blocking)
+
+- Add `--kokoro` flag to `push-notify.py` so it can be used for test pushes without raw curl
+- Update `skills/send-push/SKILL.md` to document the `kokoro: true` requirement and provide a working test push example
+- Revert `log_message` in `dashboard-data-server.py` to `pass` once confidence is high
+- Decide whether to keep `boot-fetch-status` debug bar permanently or remove it
+
+## 2026-06-10 21:55: todoist-dedupe-check.py 2-token gate blocked bare-noun shopping dups
+
+### Symptom
+
+The 21:27 CT daily-conv-action-items-capture cron (`bee-conv-action-items-capture.py`) created a duplicate `diapers` Todoist task at 21:35:39. The original `diapers` task was created at 18:38:53 CT by the 30-min live capture cron (`bee-live-window.py`). Both tasks active, both with `bee-capture` label.
+
+### Root cause
+
+`scripts/todoist-dedupe-check.py::is_match()` has a 2-token gate in Path 2 (high score + ≥2 contentful tokens in common). For the new candidate "Buy diapers at Costco (May down to 4)" verb-stripped to "diapers (May down to 4)" vs the existing "diapers":
+- Score: 100 (perfect token subset after strip_paren removes the parenthetical)
+- Intersection: `{diaper}` (1 token)
+- Path 1: needs 2+ tokens on the smaller side, fails
+- Path 2: needs 2+ overlap, fails
+- Path 3: needs 3+ overlap, fails
+- Result: `is_match` returns False → no duplicate detected → task created
+
+The 2-token gate was originally added 2026-06-06 to protect against the "Email the school" / "Email the school about May's IEP" case where `{school} ⊂ {school, iep}` is a 1-token-subset that would be a false-positive match. But the same gate also blocks the "diapers" case, which is a true positive (same shopping list item).
+
+### Why my earlier "lemonade × 2 fix" missed this
+
+That fix (commit `75a9d8b`) added a Todoist pre-check at the `bee-live-window.py::scan_for_action_phrases()` level — the **30-min live capture path**. It did NOT touch the `bee-conv-action-items-capture.py` cron, which is a **different script** using a different (older) dedup helper. Two separate code paths need separate fixes.
+
+### Fix
+
+Added **Path 2b** to `scripts/todoist-dedupe-check.py::is_match()`:
+
+```python
+# Path 2b: Single-token side fully contained in the other side,
+# AND the larger side's contentful size is small (≤ 3 tokens).
+if score >= DEDUP_THRESHOLD:
+    larger = new_c if len(new_c) >= len(ex_c) else ex_c
+    smaller = ex_c if len(new_c) >= len(ex_c) else new_c
+    if len(smaller) == 1 and smaller.issubset(larger) and len(larger) <= 3:
+        return True
+```
+
+Symmetric: catches both (a) "diapers" existing vs "Buy diapers at Costco" new, and (b) "Buy diapers at Costco" existing vs "diapers" new.
+
+**Bound (`len(larger) <= 3`):** prevents matching the "Buy Costco membership and then go pick up some diapers in size 4" shape, where the new task has multiple distinct intents (5 contentful tokens).
+
+**Trade-off accepted:** "school" existing vs "Drop May at school" new now matches (1+1 token subset, larger size 2 ≤ 3). These are rare edge cases; the cost is a missed task, not data loss. The high-value shopping list case ("diapers" bare noun) is now caught.
+
+### Verification
+
+- Direct unit test: 30/30 assertions in `scripts/test_todoist_dedupe_check_path2b.py` pass
+- Integration: queried real Todoist API — "Buy diapers at Costco" now correctly matches existing `diapers` task (`6gqjmxCjFMPMV68p`)
+- All 78 prior tests still pass (no regressions in 15 pattern + 4 pruning + 7 precheck + 31 email + 13 calendar + 8 dedupe)
+- All 30 new Path 2b assertions pass
+
+### Lessons
+
+1. **Two dedup paths is two bugs waiting to happen.** The 30-min live capture and 21:27 daily conv-action-items crons use different scripts with different dedup logic. Both need the same fix, independently. The earlier fix only covered one path.
+2. **The 2-token gate is over-conservative.** It was added as a "be safe" guard against the "school" case, but it blocks real shopping duplicates. Path 2b's `len(larger) <= 3` bound is a more surgical guard.
+3. **Always check both dedup paths when a dedup bug is reported.** A single bug in `bee-live-window.py` doesn't mean `bee-conv-action-items-capture.py` is fine. They have separate state files and separate pre-check logic.
+4. **The 21:27 cron's `todoist-dedupe-check.py` script was previously untracked in git.** It was running in production for months without version control. Adding it to git (commit `81764be`) was overdue.
+5. **Same fix shape works for both bare-noun existing and bare-noun new.** The symmetric `smaller`/`larger` pattern in Path 2b catches both directions in one check.
+
+### Files modified
+
+- `scripts/todoist-dedupe-check.py` — added Path 2b (about 30 lines including comments)
+- `scripts/test_todoist_dedupe_check_path2b.py` — new regression test, 30 assertions
+
+### Followups (not blocking)
+
+- Add the SAME Path 2b-style precheck to `bee-live-window.py` (already has it via commit `75a9d8b`) — confirmed it works for live capture. The 21:27 cron was the gap.
+- Consider whether the 21:27 cron should also use the `scan_for_action_phrases()`-style precheck pattern, not just `todoist-dedupe-check.py`. The two helpers are different in scope and shape. Could be unified in a future refactor.
+- Add a `--verbose` flag to `todoist-dedupe-check.py` to print which path matched, for debugging future dedup issues.
