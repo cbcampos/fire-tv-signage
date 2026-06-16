@@ -20,6 +20,8 @@ RDIR = "/tmp/daily-recipe"
 KOKORO = os.path.join(WORKSPACE, "scripts/kokoro_tts.sh")
 DCAST = os.path.join(WORKSPACE, "skills/dashcast/dashcast.py")
 MEAL_PLAN_PATH = os.path.join(WORKSPACE, "memory/meal-plan-current.md")
+NO_RECIPE_FALLBACK_PATH = os.path.join(WORKSPACE, "scripts/no-recipe-fallback.json")
+NO_RECIPE_NAMES = {"no plan tonight", "🤷 no plan tonight"}
 TODAY_OBJ = date.today()
 TODAY = TODAY_OBJ.strftime("%Y-%m-%d")
 TODAY_MONTH_DAY = TODAY_OBJ.strftime("%b %d")
@@ -543,10 +545,50 @@ def load_recipe_from_args(args):
         return meal_plan_recipe
     title, description = fetch_todoist()
     if not title:
+        fallback = load_no_recipe_fallback()
+        if fallback and not getattr(args, "strict_no_recipe", False):
+            print("INFO: No recipe found for today — using no-plan fallback card.")
+            print(f"  Add a task to Dinner due today. Accepted project IDs: {sorted(DINNER_PROJECT_IDS)}")
+            return fallback
         print("ERROR: No recipe found for today.")
         print(f"  Add a task to Dinner due today. Accepted project IDs: {sorted(DINNER_PROJECT_IDS)}")
         sys.exit(1)
     return parse_recipe(title, description)
+
+
+def load_no_recipe_fallback():
+    """Load the friendly 'no plan' recipe used when no real recipe is in Todoist.
+
+    Lives in scripts/no-recipe-fallback.json so the joke text is easy to tweak
+    without touching the cast pipeline. Returns None if the file is missing
+    or malformed — caller falls back to the strict error path.
+    """
+    if not os.path.exists(NO_RECIPE_FALLBACK_PATH):
+        return None
+    try:
+        with open(NO_RECIPE_FALLBACK_PATH, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"WARN: no-recipe fallback unavailable ({exc}); proceeding without fallback.")
+        return None
+    ingredients = []
+    for item in payload.get("ingredients", []):
+        if isinstance(item, dict):
+            ingredients.append({"amount": item.get("amount", ""), "item": item.get("item", "")})
+    steps = [str(step).strip() for step in payload.get("steps", []) if str(step).strip()]
+    if not steps or not payload.get("name"):
+        print("WARN: no-recipe fallback missing name/steps; proceeding without fallback.")
+        return None
+    return {
+        "name": payload["name"],
+        "emoji": payload.get("emoji", "🤷"),
+        "ingredients": ingredients,
+        "steps": steps,
+        "temp": payload.get("temp", "Room temp"),
+        "time": payload.get("time", "0 min"),
+        "servings": payload.get("servings", "Just Chris"),
+        "is_fallback": True,
+    }
 
 
 def main():
@@ -569,6 +611,7 @@ def main():
     parser.add_argument("--deploy-only", action="store_true")
     parser.add_argument("--build-only", action="store_true", help="Build /tmp/daily-recipe/index.html and stop before deploy/cast")
     parser.add_argument("--no-audio", action="store_true", help="Skip TTS generation and build with empty audio slots")
+    parser.add_argument("--strict-no-recipe", action="store_true", help="Disable the no-recipe fallback card and error out instead (use for debugging)")
     args = parser.parse_args()
 
     recipe = load_recipe_from_args(args)
@@ -577,8 +620,16 @@ def main():
     name_lower = recipe.get("name", "").lower()
     skip_phrases = ["no recipe", "eating out", "restaurant", "takeout", "delivery", "going out"]
     if any(phrase in name_lower for phrase in skip_phrases):
-        print(f"SKIP: {recipe['name']} — restaurant/meal out, no recipe to cast.")
-        sys.exit(0)
+        # Use the no-plan fallback card so the Kitchen Display gets refreshed
+        # even on eating-out / takeout nights (otherwise the display stays on
+        # the previous recipe, sometimes days old).
+        fallback = load_no_recipe_fallback()
+        if fallback and not getattr(args, "strict_no_recipe", False):
+            print(f"INFO: '{recipe['name']}' marked as no-recipe — using no-plan fallback card instead of skipping.")
+            recipe = fallback
+        else:
+            print(f"SKIP: {recipe['name']} — restaurant/meal out, no recipe to cast.")
+            sys.exit(0)
 
     recipe["steps"] = [str(step).strip() for step in recipe["steps"] if str(step).strip()]
     step_count = len(recipe["steps"])
