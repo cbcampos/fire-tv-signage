@@ -1,0 +1,11 @@
+# Secrets
+amp-api-bearer.txt
+amp-api-token.txt
+
+# Audio downloads (large, regenerate from audio URLs)
+audio/
+__pycache__/
+
+# Build artifacts
+*.pyc
+.DS_Store
