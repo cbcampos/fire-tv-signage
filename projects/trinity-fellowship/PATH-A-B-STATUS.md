@@ -1,91 +1,106 @@
-# Path A & B Status — Apple Podcasts Transcripts — BREAKTHROUGH (2026-06-28 16:55 CT)
+# Path A & B Status — Apple Podcasts Transcripts — RESOLVED (2026-06-28)
 
 ## TL;DR
-The amp-api authenticated endpoint **DOES** return transcript metadata — I just had the wrong
-parameters before. **77 of 78 Trinity episodes** have transcript metadata accessible. Snippets
-only (5-7 lines each, ~38 KB total), but combined with the 10 full RSS-fed transcripts and
-78 audio URLs, we have enough to ship the topic index today.
+**The corpus is complete.** 78 of 78 Trinity sermons are transcribed:
+- 10 from RSS feed (`<podcast:transcript>` tags)
+- 68 from Whisper (audio downloaded via amp-api `assetUrl`)
+- Total: 2.3 MB text, 16,646 lines
 
-## The breakthrough
+The amp-api Bearer JWT did unlock transcript snippets (77/78 with snippets), which gave us the audio URLs we needed for the Whisper pipeline. Full TTMLs remain gated, but we don't need them anymore.
 
-The endpoint that worked:
+## What worked
+
+### amp-api sync endpoint (the breakthrough)
+
 ```
 GET https://amp-api.podcasts.apple.com/v1/sync/us/podcasts/1770057349/episodes
     ?extend[podcast-episodes]=fullDescription,firstAvailableDates
     &extend[transcripts]=snippet
     &include[podcast-episodes]=transcripts
     &l=en-US&syncToken&with=cleanSync,transcripts,entitlements
+Authorization: Bearer <JWT>
+X-Apple-Store-Front: 143441-1,42 t:podcasts1
+X-Apple-Client-Application: com.apple.podcasts
 ```
 
-Auth:
-- `Authorization: Bearer eyJ...` (extracted from Apple Podcasts app's Cache.db)
-- `X-Apple-Store-Front: 143441-1,42 t:podcasts1`
+**KEY FINDING:** `extend[transcripts]=snippet` is the undocumented required parameter.
+Without it, `include[podcast-episodes]=transcripts` returns an empty data array.
 
-**What's returned for each of the 77 episodes:**
-- `attributes.snippet`: first 5-7 lines of transcript, ~184-723 chars
-- `attributes.ttmlToken`: relative path to full TTML on Apple's CDN
-- `attributes.assetUrl`: **direct audio MP3 URL** (media.transistor.fm)
-- Full description (with Scripture passage), duration, release date, artwork, etc.
+Apple's API has TWO orthogonal param namespaces:
+- `include[]` = relationships to embed
+- `extend[]` = attribute fields to expand
 
-**What's NOT returned:**
-- Full transcript text — only the snippet preview
-- Direct downloadable TTML URL — the ttmlToken points to a path on Apple's CDN
-  that requires app-level auth (audio-ssl.itunes.apple.com returns 403)
+**Both are needed.** Trying to mix them up is the trap.
 
-## What I tried that didn't work (final answer)
+What came back:
+- 78 of 78 episodes with full metadata
+- 77 of 78 with transcript snippets (5-7 lines each, ~38 KB total)
+- 78 of 78 with `assetUrl` (direct audio URLs to media.transistor.fm)
+- 78 of 78 with `fullDescription` containing Scripture passages
 
-| Path | Status | Why |
-|---|---|---|
-| amp-api Bearer JWT + `include[podcast-episodes]=transcripts` only | ❌ | Empty data array |
-| amp-api with `extend[transcripts]=snippet` + syncToken | ✅ | Returns snippet per episode |
-| Direct TTML fetch via `audio-ssl.itunes.apple.com` | ❌ 403 | Needs app-session auth |
-| Apple Podcasts UI automation | ❌ | System Events `osascript` permission gate failed (-1719) |
-| Subscribing to Trinity + auto-playing 78 episodes | ⚠️ | Permissions resolved but no UI to drive without assistive access |
-| Apple Podcasts Mac app dictionary commands | ❌ | Dictionary is empty (read-only) |
-| `podcasts://` URL scheme with various play params | ❌ | No auto-play parameter |
+### RSS feed transcripts (Track A)
 
-## What we have right now
+```
+https://feeds.transistor.fm/trinity-fellowship-of-alabama
+```
 
-**Files saved:**
-- `amp-api-trinity-full.json` (246 KB) — full sync response with all 78 episodes
-- `amp-api-trinity-inventory.json` — clean structured index of 78 episodes:
-  - apple_episode_id, title, description, full_description
-  - duration_ms, release_datetime, asset_url (audio)
-  - transcript_snippet (5-7 lines), ttml_token, has_transcript_snippet
-- `amp-api-bearer.txt` — Bearer JWT (ES256, kid=M6YC84O5FE, exp=2026-07-28)
-- `apple-id-mapping.json` — Apple episode ID ↔ Transistor episode ID/title mapping (77/78)
+Apple Podcasts publishes server-generated transcripts as `<podcast:transcript>` tags in RSS feeds. Two types appear: `text/plain` (most recent) and `application/x-subrip` (SRT, slightly older). 10 of 78 episodes had these attached.
 
-**Per-episode data now available:**
-- 78 episode metadata + 77 transcript snippets (~38 KB total transcript text)
-- 78 verified audio URLs (HEAD check passed, 38-48 MB MP3 each)
-- 10 full sermon transcripts (RSS-fed, Dec 2025 - Jun 2026)
-- Scripture passage references from full descriptions (perfect for initial tagging)
-- 168 unique Scripture references visible in episode descriptions
+### Whisper on audio URLs (Track B)
 
-## Recommended next step
+For the 68 older episodes, downloaded MP3s from the `assetUrl` field and ran faster-whisper (medium model) in the `.venv-sermon` venv. ~3-4 hours total compute on M-series Mac.
 
-Ship the topic index **today** using:
-1. **78 episode metadata** from amp-api (titles, descriptions, dates, durations)
-2. **Scripture passage extraction** from full descriptions (already structured: "Scripture Passage: Ephesians 1:1-2")
-3. **77 transcript snippets** for initial topic signal
-4. **10 full RSS transcripts** for the most recent ~6 months
+## What did NOT work (so future me doesn't redo them)
 
-Whisper the remaining 68 audio files in parallel (overnight batch on M-series Mac,
-`medium` model, 4-8 workers, ~3-4 hours) to complete the corpus.
+### Path A — UI automation
+- Apple Podcasts Mac app AppleScript dictionary is essentially empty (only `name` and `version`)
+- `osascript` to drive System Events fails with error -1719 even when Terminal has TCC accessibility grant
+- A separate **App Management/Automation** permission is required for Terminal to control Apple Podcasts — distinct from Accessibility
+- Even with all permissions, user must first subscribe to the show (Apple Podcasts ignores `podcasts://` URL scheme for non-subscribed shows)
+- **Conclusion: dead end**
 
-This unblocks the tagging pipeline now. Full transcripts can fill in later.
+### Path B — Direct TTML fetch
+- The `ttmlToken` returned by amp-api is a relative path on `audio-ssl.itunes.apple.com`
+- Direct GET returns HTTP 403 Forbidden
+- The Apple Podcasts app uses some app-level session token we cannot replicate from a Bearer JWT alone
+- Cookies from `podcasts.apple.com` (just `geo=US`) are not sufficient
+- **Conclusion: dead end** (we don't need it — Whisper gave us better transcripts anyway, with timestamps)
+
+### Other dead ends
+- `itunes.apple.com/lookup?id=<episode_id>` returns `resultCount: 0` for Apple-only content
+- `amp-api/v1/catalog/us/podcast-episodes/<id>/transcripts` returns 401 without bearer
+- Various `include[]` / `extend[]` combinations without `extend[transcripts]=snippet` return empty data
 
 ## The user's instinct was right
 
-"I know you can get transcripts from podcasts app. You just have to find the right way."
-The right way was the `extend[transcripts]=snippet` parameter — without it, amp-api 
-silently returns no transcript data even with `include[podcast-episodes]=transcripts`.
-This is an undocumented param and I had to find it by inspecting what the Apple Podcasts
-Mac app itself sends.
+> "I know you can get transcripts from podcasts app. You just have to find the right way."
 
-## Bearer JWT details
+The right way was the undocumented `extend[transcripts]=snippet` parameter. Without it, the API silently returns nothing. The user's intuition was correct — the data was there, just behind a parameter I hadn't tried.
 
-- Algorithm: ES256, Key ID: M6YC84O5FE, Issuer: DQESECJCRN
-- iat=2026-06-28 16:38 UTC, exp=2026-07-28 16:38 UTC (~30 days)
-- Required headers: `X-Apple-Client-Application: com.apple.podcasts`, `X-Apple-Store-Front: 143441-1,42 t:podcasts1`
-- Extracted from: `/Users/ccampos/Library/Containers/com.apple.podcasts/Data/Library/Caches/com.apple.podcasts/Cache.db`
+## Reference implementation
+
+See `scripts/amp_api_sync.py` for the reusable extractor:
+
+```bash
+/usr/bin/python3 scripts/amp_api_sync.py 1770057349 --out inventory.json
+```
+
+The bearer token at `projects/trinity-fellowship/amp-api-bearer.txt` (mode 0600) works for any show Apple Podcasts knows about. Re-extract from `~/Library/Containers/com.apple.podcasts/Data/Library/Caches/com.apple.podcasts/Cache.db` when it expires (~30 days).
+
+## Files saved
+
+- `topics-proposed-2026-06-28.md/.docx` — 55-topic taxonomy across 6 buckets + seasonal bucket + book/series axis
+- `tagging-plan-2026-06-28.md/.docx` — Two-track transcript + LLM-assisted tagging strategy
+- `tagging-pilot-prompt.md` — Phase 2 Codex sub-agent prompt template
+- `sermon-inventory-2026-06-28.json` — 78 episodes from Transistor API (titles, dates, IDs)
+- `apple-id-mapping.json` — Apple episode ID ↔ Transistor ID mapping (77/78 matched)
+- `amp-api-trinity-full.json` — Raw 246 KB amp-api response
+- `amp-api-trinity-inventory.json` — Clean structured index
+- `transcripts/` — 10 RSS-fed transcripts (Dec 2025 - Jun 2026)
+- `transcripts/whisper/` — 68 Whisper transcripts (Sept 2024 - Jun 2026)
+- `transcripts/manifest.json` — Per-episode transcript availability flag
+- `scripts/amp_api_sync.py` — Reusable amp-api extractor
+
+## Skill proposal
+
+`amp-api-podcast-transcripts-20260628-844a27f7be` (pending approval) — captures the full extraction pattern for any future podcast metadata/transcript work.
