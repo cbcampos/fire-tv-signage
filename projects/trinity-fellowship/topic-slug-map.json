@@ -59,7 +59,10 @@
     "heaven-and-hell": "Heaven & Hell",
     "the-end-times-and-eschatology": "The End Times & Eschatology",
     "spiritual-warfare-angels-and-demons": "Spiritual Warfare, Angels & Demons",
-    "life-after-death": "Life After Death"
+    "life-after-death": "Life After Death",
+    "the-gospel": "The Gospel",
+    "salvation": "Salvation",
+    "integrity-truthfulness-and-speech": "Integrity, Truthfulness & Speech"
   },
   "topic_to_slug": {
     "The Trinity": "the-trinity",
@@ -121,7 +124,10 @@
     "Heaven & Hell": "heaven-and-hell",
     "The End Times & Eschatology": "the-end-times-and-eschatology",
     "Spiritual Warfare, Angels & Demons": "spiritual-warfare-angels-and-demons",
-    "Life After Death": "life-after-death"
+    "Life After Death": "life-after-death",
+    "The Gospel": "the-gospel",
+    "Salvation": "salvation",
+    "Integrity, Truthfulness & Speech": "integrity-truthfulness-and-speech"
   },
   "topics_by_bucket": "see taxonomy doc"
 }

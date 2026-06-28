@@ -39,6 +39,8 @@ Topics covering the person and work of Christ and the application of salvation.
 
 - **The Person of Christ** — Fully God and fully man; virgin birth; hypostatic union; the two natures in one person.
 - **The Work of Christ** — Atonement, crucifixion, resurrection, ascension, session at God's right hand, intercession; prophet/priest/king.
+- **The Gospel** — The whole story of God's saving work in Christ — what it is, why it matters, how it applies. A meta-topic that runs through most sermons; use when the sermon names or explains "the gospel" itself rather than a specific element (use `justification` for imputed righteousness, `sanctification` for progressive growth, `repentance-and-saving-faith` for the human response, etc.).
+- **Salvation** — The full scope of God's saving work in a person's life: from election through glorification. Broader than `repentance-and-saving-faith` (which is the human response) — use when a sermon surveys the whole arc or names salvation as a unified theme rather than any single piece.
 - **The Covenant of Grace** — How the Old and New Testaments fit together as one plan of redemption; covenant of works vs. covenant of grace.
 - **Justification** — Declared righteous by grace alone, through faith alone, in Christ alone; imputation of Christ's righteousness.
 - **Adoption** — Believers as children of God; inheritance; Father–child relationship.
@@ -79,7 +81,8 @@ Topics covering the Bible's authority and the believer's daily walk.
 - **Suffering, Trials & Comfort** — Why God allows suffering; perseverance; comfort from God and community.
 - **Anxiety, Fear & Hope** — Anchoring the heart in God's promises; courage in uncertain seasons.
 - **Anger, Forgiveness & Reconciliation** — Dealing with anger; the cost and grace of forgiveness; pursuing peace.
-- **Temptation & Sin** — Sources of temptation; mortification; the believer's fight against remaining sin.
+- **Temptation & Sin** — Sources of temptation; mortification; the believer's fight against remaining sin. When a sermon is about original sin / the doctrine of humanity's fallen nature rather than personal temptation, also pull in `sanctification` for the contrast God is drawing.
+- **Integrity, Truthfulness & Speech** — Honesty, faithfulness, the danger of falsehood, the power of the tongue; includes themes from Psalm 15 and similar passages that don't fit cleanly into sanctification/good-works. Distinct from `anger-forgiveness-and-reconciliation` (which is about restoring relationship after being wronged).
 - **Identity in Christ** — Who we are in union with Christ; new creation; freedom from false identities.
 
 ## Bucket 5 — Mission, Community & Witness
@@ -140,3 +143,16 @@ Topics covering the end of the age and the unseen spiritual realm.
 ## Next Step
 
 Tagging plan drafted and saved alongside this file: `tagging-plan-2026-06-28.md` (and `tagging-plan-2026-06-28.docx`). It pulls the full 78-episode inventory from Transistor (show 57028), proposes a 4-phase workflow (transcripts → tagging → storage → public page), and recommends LLM-assisted tagging with Chris's verification pass using a Codex sub-agent. See that doc for details.
+
+## Updated 2026-06-28 (after pilot)
+
+After tagging the first 10 sermons, three additions were made:
+
+6. **`gospel` and `salvation` added as discrete topics in Bucket 2.** The pilot showed both are recurring sermon themes that didn't fit cleanly into existing topics. `gospel` is the meta-topic (what it is, why it matters, how it applies); `salvation` is the full arc of God's saving work. `repentance-and-saving-faith` and `justification` remain narrower tags for the human response and imputed righteousness respectively.
+7. **`integrity-truthfulness-speech` added to Bucket 4.** Psalm 15 and similar passages (honesty, faithfulness, the tongue) didn't sit cleanly under `sanctification`/`good-works` in the pilot.
+
+These bring the doctrinal topic count from 55 to 58.
+
+## Topic slug map
+
+For Codex sub-agent tagging, every topic title above maps to a kebab-case slug. The full mapping is in `topic-slug-map.json`. Include that file in the tagging prompt so Codex uses canonical slugs from the start.
