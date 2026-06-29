@@ -1,0 +1,178 @@
+[
+  {
+    "date": "2025-09-22",
+    "title": "I Will Build My Church",
+    "primary_passage": "Matthew 16:13-28",
+    "topics": [
+      "the-church",
+      "the-person-of-christ",
+      "the-work-of-christ",
+      "discipleship-and-spiritual-growth",
+      "the-communion-of-saints"
+    ],
+    "book": "Matthew",
+    "series": null,
+    "seasonal": null,
+    "confidence_notes": "Anniversary/church-plant sermon centered on Jesus' promise to build his church, grounding confidence in his identity, cross-and-resurrection work, and the shared call to follow him together."
+  },
+  {
+    "date": "2025-10-06",
+    "title": "Firm Foundation: What We Believe About Scripture",
+    "primary_passage": "2 Timothy 3:14-4:5",
+    "topics": [
+      "the-authority-and-inspiration-of-scripture",
+      "how-to-read-and-interpret-the-bible",
+      "salvation",
+      "sanctification",
+      "good-works",
+      "the-person-of-christ"
+    ],
+    "book": "2 Timothy",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Doctrine of Scripture sermon: canon, inspiration, authority, sufficiency, Christ-centered revelation, Scripture's saving purpose, and its role in training believers for transformation and good works."
+  },
+  {
+    "date": "2025-10-12",
+    "title": "Firm Foundation: What We Believe About Humanity",
+    "primary_passage": "Genesis 1:26-28",
+    "topics": [
+      "creation",
+      "identity-in-christ",
+      "vocation-and-work",
+      "marriage-sex-and-family",
+      "disciplemaking",
+      "the-person-of-christ",
+      "sanctification"
+    ],
+    "book": "Genesis",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Humanity/image-of-God sermon fits the creation anchor: humans as creatures, embodied image bearers, male and female, made to reflect God's glory, cultivate creation, and have the image restored in Christ."
+  },
+  {
+    "date": "2025-10-20",
+    "title": "Firm Foundation: What We Believe About Sin",
+    "primary_passage": "Romans 5:12-17",
+    "topics": [
+      "temptation-and-sin",
+      "sanctification",
+      "the-work-of-christ",
+      "justification",
+      "salvation",
+      "repentance-and-saving-faith",
+      "the-law-and-the-gospel"
+    ],
+    "book": "Romans",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Doctrine of sin sermon treats sin as action, desire, and fallen nature in Adam, then contrasts that with Christ's representative obedience, justification, salvation, repentance, and ongoing war against sin."
+  },
+  {
+    "date": "2025-11-03",
+    "title": "Firm Foundation: What We Believe About Jesus",
+    "primary_passage": "John 1:1-18",
+    "topics": [
+      "the-person-of-christ",
+      "the-work-of-christ",
+      "the-trinity",
+      "the-authority-and-inspiration-of-scripture",
+      "repentance-and-saving-faith",
+      "salvation"
+    ],
+    "book": "John",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Jesus doctrine sermon emphasizes the incarnate Word as fully God and fully human, Son from the Father, center of Scripture, crucified and raised, and personally received by faith for life."
+  },
+  {
+    "date": "2025-11-09",
+    "title": "Firm Foundation: What We Believe About the Holy Spirit",
+    "primary_passage": "Acts 2:1-21",
+    "topics": [
+      "the-person-and-work-of-the-holy-spirit",
+      "pentecost",
+      "the-church",
+      "the-gifts-of-the-spirit",
+      "sanctification",
+      "the-great-commission-and-evangelism",
+      "the-lords-supper"
+    ],
+    "book": "Acts",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Holy Spirit sermon on Pentecost, the Spirit's deity/personhood, indwelling presence, regeneration, transformation, gifts for the church, witness to Christ, and communion as fellowship by the Spirit."
+  },
+  {
+    "date": "2025-11-16",
+    "title": "Firm Foundation: What We Believe About the Church",
+    "primary_passage": "Acts 2:41-47",
+    "topics": [
+      "the-church",
+      "the-communion-of-saints",
+      "the-trinity",
+      "the-person-and-work-of-the-holy-spirit",
+      "baptism",
+      "the-great-commission-and-evangelism",
+      "christian-witness-in-culture"
+    ],
+    "book": "Acts",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "First church sermon focuses on identity: the church as community, family, temple, and kingdom outpost, created for fellowship, gathered by the gospel, indwelt by the Spirit, and witnessing to Christ's reign."
+  },
+  {
+    "date": "2025-11-23",
+    "title": "Firm Foundation: What We Believe About the Church",
+    "primary_passage": "Acts 2:41-47",
+    "topics": [
+      "the-church",
+      "baptism",
+      "the-lords-supper",
+      "the-communion-of-saints",
+      "worship",
+      "home-groups-and-small-groups",
+      "the-great-commission-and-evangelism"
+    ],
+    "book": "Acts",
+    "series": "Firm Foundation",
+    "seasonal": null,
+    "confidence_notes": "Second church sermon focuses on practices: receiving the gospel, baptism, apostles' teaching, fellowship, breaking bread, prayers, shared life in homes, generosity, and common witness as the Lord adds to the church."
+  },
+  {
+    "date": "2025-12-15",
+    "title": "Joyful Surrender",
+    "primary_passage": "Matthew 13:10-17, 44-46",
+    "topics": [
+      "discipleship-and-spiritual-growth",
+      "repentance-and-saving-faith",
+      "money-possessions-and-generosity",
+      "the-person-of-christ",
+      "sanctification",
+      "advent",
+      "worship"
+    ],
+    "book": "Matthew",
+    "series": null,
+    "seasonal": "advent",
+    "confidence_notes": "Advent joy sermon on the treasure hidden in the field: seeing Christ and his kingdom as supremely valuable, joyfully surrendering lesser treasures, and letting that joy reshape giving, obedience, and worship."
+  },
+  {
+    "date": "2025-12-21",
+    "title": "Why Bethlehem?",
+    "primary_passage": "Matthew 2:1-12",
+    "topics": [
+      "christmas",
+      "advent",
+      "the-person-of-christ",
+      "the-work-of-christ",
+      "the-authority-and-inspiration-of-scripture",
+      "suffering-trials-and-comfort",
+      "life-after-death"
+    ],
+    "book": "Matthew",
+    "series": null,
+    "seasonal": "advent",
+    "confidence_notes": "Advent/Christmas sermon asks why Bethlehem: fulfilled prophecy, the birth of the eternal King, sorrow and death answered by Christ's death and victory, hope beyond death, and the call to receive the Savior."
+  }
+]
