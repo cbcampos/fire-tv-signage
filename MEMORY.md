@@ -16,7 +16,11 @@
 
 ## Model Policy
 - **Default primary:** `minimax-portal/MiniMax-M3`. Fallback: `openai/gpt-5.5`.
-- **Cron agentTurn jobs:** `payload.model: "minimax-portal/MiniMax-M3"`, `payload.fallbacks: []`. M3 is the only cron model that works. Full 2026-06-09 sweep (38 crons): archive → "2026-06-09 16:52".
+- **Cron agentTurn jobs (Bee Live Capture, 2026-06-29 20:35 CT update — MiniMax-M3 as primary, gpt-5.5 routed via codex harness):** Codex App Server plugin (`openclaw-codex-app-server`) and Codex Supervisor both DISABLED in plugin registry as of ~20:00 CT 2026-06-29. Any cron using `openai/gpt-5.5` (or 5.4 / 5.5-pro) errors with `MissingAgentHarnessError: Requested agent harness "codex" is not registered.` because all three gpt-5.x models have `agentRuntime: {id: "codex"}` in `~/.openclaw/openclaw.json`. Verified: 5 consecutive failures (20:08, 20:11×2, 20:13, 20:14). Switched to `minimax-portal/MiniMax-M3` (default main runtime, no codex dependency) — natural 20:38 run succeeded in 105s with HEARTBEAT_OK. **If M3 also degrades, fallback chain needs to include another model WITHOUT codex agentRuntime — that means another MiniMax model (M2.7 is OK) or openai/gpt-4.x if exposed.** To re-enable codex later: figure out why plugin registry went to disabled (probably another openclaw install/upgrade side-effect; investigate before just `openclaw plugins enable`). DO NOT swap back to gpt-5.5 until codex harness is back.
+- **Why we switched M2.7 → gpt-5.5 (2026-06-21 22:03 CT, Bee Live Capture only):** M2.7 was primary from 16:52 CT onward (after M3 started hanging). M2.7 was healthy through 17:25 (HEARTBEAT_OK runs at 17:38, 18:38, 19:08, 19:38, 20:08, 20:38). Then 3 hangs in ~3.5 hours: 18:08, 21:08, 21:38 — all at `model-call-started`, all 180s timeouts. 25% failure rate, well above the 1/20 threshold. Same hang failure mode as M3 before it. **Both MiniMax models are now exhibiting intermittent hangs at `model-call-started`** — looks like a model-tier or routing issue, not model-specific. Lesson reinforced: when a model is hanging, the failure mode is **a hang (no error, no return), so fallbacks DON'T fire** — the cron-level timeout is the only thing that catches it. So the right move is to put the currently-healthy model in PRIMARY, not hope fallbacks rescue you.
+- **Trap: hangs vs errors.** Fallbacks trigger on model RETURNING an error. A model that hangs (no response, just sits) burns the full `timeoutSeconds` (300s by default) and the cron records `model-call-started` timeout. The fallback chain never engages. For hangs to trigger fallbacks, you'd need a model-level call timeout (e.g. 60s) — OpenClaw doesn't expose that today. So fallbacks only protect against the model returning an error promptly. Practical rule: for cron jobs, the **primary model choice matters more than the fallback list** because hangs dominate the failure mode.
+- **Trap: cron config-cache lag (NEW 2026-06-21 22:08 CT).** When you patch a cron's `payload.model`/`payload.fallbacks`/`payload.timeoutSeconds` via `openclaw cron update`, the file's `updatedAtMs` advances immediately — but the runtime does NOT pick up the new config until much later. Observed: first patch at 17:25 CT (`updatedAtMs: 1782097522205`) didn't take effect for ~5 hours; all 12 runs in between still used the old M2.7 config. The second patch at 17:29 CT (`updatedAtMs: 1782097725636`) is what actually took effect, and the next scheduled run at 22:08 CT was the first to use gpt-5.5. **Don't trust `updatedAtMs` as proof of effect.** Verify the next 1-2 runs actually use the new model. If they don't, force with `openclaw cron run --id <id> --run-mode force` to validate. **Tooling (added 2026-06-22 04:30 CT by Overnight Builder):** `scripts/cron-patch-verify.py <cron-id> [--expected-model M] [--auto-force] [--json]` answers "did my patch land yet?" with one of four exit-coded verdicts — verified (0), stale (1), inconclusive (2), error (3). Run it after every cron model/fallbacks/timeout patch; pass `--auto-force` to fire one validation run immediately if you can't wait. Smoke test: `python3 scripts/test-cron-patch-verify.py`. Full ref: `memory/overnight-builds.md` → "2026-06-22 — cron-patch-verify.py".
+- **Bee Live Capture specific (2026-06-21 22:08 CT):** gpt-5.5 is primary. The 22:08 CT run succeeded in 45.6s on gpt-5.5 (5,165 in / 1,949 out tokens). Watch `openclaw cron runs --id 666809fb-8df6-4f7d-b45b-0226450ae443` periodically; if gpt-5.5 starts hanging more than ~1/20, the diagnostic is the same — which model is healthy RIGHT NOW, put it in primary. The M2.7 hang pattern from 16:52–22:03 CT was the warning; the question is whether gpt-5.5 holds steady or degrades over the next 24-48h.
 - **Compaction summarizer:** `minimax-portal/MiniMax-M3`.
 - **Codex runtime:** `sessions_spawn(agentId="codex", task=..., taskName=...)`. **Don't trust sub-agent self-reports** — verify with `session_status(sessionKey=<childKey>)`. Markers: `Runtime: OpenAI Codex`, `Model: openai/gpt-5.5`. Full: `memory/codex-runtime-invocation.md`.
 - **gpt-5.5 thinking:** OpenClaw path only accepts `off`; Codex app-server accepts `low`. `high` always fails.
@@ -29,7 +33,21 @@
 - **Failures:** "Tool result missing" → wrong model (gpt-5.5). "subscription usage limit" → Codex rate limit, wait ~30 min.
 - **Full spawn template + IP tripwires + 2026-06-08 lessons:** `memory/ref/kids-story-image-gen.md`.
 
+## Story TTS Optimization — `*-shareable.md` is the TTS source (2026-06-27)
+Story 1 first MP3 shipped with 5 avoidable TTS bugs (run-on opener, subtitle swallowed by `strip_markdown`, dangling pronoun, age-inappropriate detail, long compound sentence). All fixed by text editing. **Full checklist + before/after examples + pre-render audit command:** `memory/ref/story-tts-optimization.md`. **Apply before every `edge_story_audio.py` call** — Story 2 onward. Source-of-truth: edit prose `story-NN-*.md` first, mirror to `*shareable.md`. **Two script-level fixes are tracked as Story 2 Tasks A and B in that doc:** (A) stop em-dash flattening in `franklin_tts_normalize.py` (replace `—` with `…` so Edge TTS pauses), (B) preserve italic-only subtitle lines in `strip_markdown` so titles land in audio. Tackle both before Story 2 first render.
+
 ## Story Video Cast Rule (2026-06-07) — CRITICAL
+
+## Jedi Academy Series — Franklin's "noticer" trait (LOCKED 2026-06-26)
+
+**Series-spanning trait:** Franklin is the one who hears what is still ringing after everyone else has stopped hearing it. Rey names him a "noticer" at the end of Story 1 Chapter 8. The arc: Book 1 = discovery, Book 2 = discipline, Book 6+ = teaching it back.
+
+**Implications for stories 2–10:**
+- Other younglings should occasionally say "what?" when Franklin hears something they missed — keeps the trait visible without belaboring it.
+- His listening stone (Rey gave it in Story 1) is the *tool* for the gift, not the gift itself.
+- When in doubt, ask: is Franklin doing the noticing, or is someone narrating it for him? Noticing must be his action.
+
+**Do NOT cross over with Franklin-Man.** Different universe, different rules.
 **NEVER cast a finished story video to the Nest Hub / Kitchen Display / any screen without Chris explicitly asking in the current turn.** Completing a story is a deliverable; casting is a separate, opt-in step. Default workflow: write → audit → chapter images → final MP4 → STOP, report status, do NOT auto-cast. Only cast when Chris's current turn contains explicit casting intent.
 
 **Chapter images: 16:9, no baked-in title.** Use 1536x1024. Video script adds titles via ffmpeg `drawtext`.
@@ -50,8 +68,39 @@ Full doc: `memory/personal/stories/story-writing-rules.md`. 19 Tells = AI-tell p
 - **Always use the UUID** for explicit-site deploys: `netlify deploy --prod --site=371fd0cb-3d1f-45c9-b88e-dbe4eb770cdb`.
 - Discover UUIDs via `netlify status` (if cwd is in a project dir) or `data/netlify-sites.md` (cross-project registry).
 
+## n8n Migration — Aborted (2026-06-16)
+Tried to move 4 crons (Email Push, Reminders, Amanda Job Alert, Rent 8pm) from OpenClaw to n8n. **Aborted.** Three structural walls hit: (1) n8n Docker container has no bind mount to `~/.openclaw/workspace`, so `Execute Command` can't reach host scripts; (2) n8n's existing Google credential is `googleSheetsOAuth2Api` only — no `gmailOAuth2` for Gmail search/send; (3) Chris doesn't want a Telegram bot in n8n, so any Telegram delivery has to callback to OpenClaw. **Decision: keep all 49 crons in OpenClaw.** n8n's "visual editability" value is undermined when every nontrivial workflow has to call back to OpenClaw for state, channels, or `gws`. The OpenClaw cron registry is the visual-cron niche. **Artifacts:** `reports/cron-n8n-audit-2026-06-16.md` (49-cron audit) + `reports/n8n-migration-plan-2026-06-16.md` (per-cron plan). One side-effect that survived: a `POST /api/send` callback endpoint was added to `dashboard-data-server.py` — Chris chose to keep it as future scaffolding.
+
+## Franklin's Quest — four-file sync trap (2026-06-16 07:52)
+The Franklin's Quest PWA has four places where the same text must match. Drift between any pair = audio/text mismatch on the kid's phone.
+1. `projects/franklin-quest/quests/<id>.json` — source (editable)
+2. `projects/franklin-quest/web/quests/<id>.json` — deployed (Netlify publishes `web/`)
+3. `projects/franklin-quest/web/app.js` — embedded fallback used when the deployed JSON fails to load
+4. `projects/franklin-quest/web/assets/tts/<id>-<n>-<slug>.mp3` — audio for each clue
+
+**When Chris edits text on the live site (the deployed `web/quests/`), the changes do NOT flow to source / embedded / TTS.** I rendered this morning's 7-station regen from stale source text, so the audio said "soft friends" while the phone displayed "games".
+
+**Rule:** when generating TTS or doing any text-driven work, **read the deployed `web/quests/<id>.json` first, not the source `quests/`.** Deployed is the user-facing truth. Source is what the dev edits.
+
+**Workflow for any text edit:**
+1. Edit the text in `web/quests/<id>.json` (this is the live one Chris sees on his phone).
+2. `cp web/quests/<id>.json quests/<id>.json` to sync source.
+3. Update the embedded fallback in `web/app.js` to match.
+4. Re-render TTS for any clue whose text changed.
+5. Bump SW version (both `sw.js` and `app.js` register call).
+6. Redeploy.
+
+**This rule should be a Skill Workshop proposal for `projects/franklin-quest/`**, not just a memory note. The four-step checklist should be required at the end of any quest edit.
+
 ## Bee Live Capture (Lane 0 cron `666809fb-...`)
-Full: `memory/ref/bee-live-capture.md`. Omi webhook only (no mic fallback), dedupe by `memory_id`, capture full window text, bounce stuck worker with `launchctl kickstart -k gui/501/com.omi-sync.worker`, reflect-daily same-day.
+Full: `memory/ref/bee-live-capture.md`. Omi webhook only (no mic fallback), dedupe by `memory_id`, capture full window text, bounce stuck worker with `launchctl kickstart -k gui/501/com.omi-sync.worker`, reflect-daily same-day. Bee Live Capture does NOT do any casting. Quiet runs return `HEARTBEAT_OK` and stay silent.
+
+**Topic dedup (added 2026-06-29 ~20:35 CT, fixes Bondo-repeat):** Wondering/answer surfaces from Step 4 are deduped against `state/bee-live-capture/answered.json` (schema in file's `_comment`). Slug = normalized noun-phrase ≤40 chars, lowercased, hyphenated (e.g. `bondo-cure-and-sanding`, `moon-distance`). 24-hour suppression window: same slug skipped within 24h of `last_answered`. Different facets of same broad topic within 24h still suppress unless materially different (>24h = NEW slug). Cron reads file at Step 1, mutates and atomically rewrites after answering (tmp + rename). Manually add a slug to bypass AI's "is this new?" judgment: edit the JSON, no code change needed. **State file path matters** — the cron prompt's Step 1 references it by absolute path `~/.openclaw/workspace/state/bee-live-capture/answered.json`. If the file is missing, the cron treats every wondering as fresh.
+
+## Daily Recipe Cast (cron `cf02715d-...`, 4:30 PM CT Mon-Sat)
+Runs `scripts/daily-recipe.py` → builds the Tonight card → deploys to Netlify → casts to Kitchen Display (192.168.2.75). Uses MiniMax-M3. 300s timeout. Failed runs post to #cron-notifications.
+
+**No-plan fun-line cast (added 2026-06-21):** When `daily-recipe.py` falls back to the "No Plan Tonight" card (no Dinner task in Todoist project `6fwwjRCMPhWF76mR` for today), the cron ALSO fires `scripts/cast-quick-message.py --pick-fun-line "Kitchen Display"`. The 12-line pool rotates daily + by 4h block: PB&J night, freezer archaeology, sandwich board meeting, quesadilla night, etc. Cast only fires 8am–9:30pm CT (sensible hours guardrail in the script — the 4:30 PM cron window is always in-range). If the cast fails, the main recipe card still went up — the cast is best-effort and does not break the run. **This is the only place the fun-line cast runs** — it is NOT tied to Bee Live Capture, NOT tied to any other cron.
 
 ## Meeting Watchdog
 Full: `memory/ref/meeting-recap-engine.md`. Hourly 8 AM - 6 PM CT, 6 PM forced wrap-up. Model M3. Kill phrases: "no recap", "skip the recap", "don't recap this", "private call", "off the record". Caller cross-checked against calendar attendees (Bee mishears "Amanda" as "Adele"). 7-day shadow run before auto-post.
@@ -65,7 +114,20 @@ For `projects/franklin-quest/` (Franklin's Quest and similar): **the station `ur
 ## Birthday Reminder System (project at `projects/birthdays/`, started 2026-06-06)
 Full: `projects/birthdays/README.md` + `projects/birthdays/plan.md`. Source of truth: `data/birthdays.json` + recurring all-day event on "Me and You" calendar (in sync). DOB format: `"YYYY-MM-DD"` (year known → "turns N today") or `"MM-DD"` (year unknown → "celebrates today"). Add/update flow: tell Dobby in chat; writes JSON + patches calendar in same turn. Morning announce: visual Nest Hub card via Web Receiver, no audio.
 
+- **2026-06-16 14:07 CT — Default-assumption trap in relationship drafting.** I drafted a response for Chris to send his wife Amanda and **silently inverted their roles**: I assumed Amanda was the household manager and wrote "let me help" / "touch me" asks that fit HER love language, not his. Chris caught it and corrected me. **The actual split: Chris cooks, cleans, schedules, and primary-parent's from home; Amanda works outside the home.** Chris is the Enneagram 8 with love languages acts of service / quality time / affirmations. Amanda is the 4 with physical touch / intimacy / gifts. **Rule for any future relationship message:** look up the Enneagram + love language + household role in `memory/personal/relationships.md` BEFORE drafting. Do not default to gender-norm assumptions. Saved to `memory/personal/relationships.md` under "Chris + Amanda — Household / Inverted Roles (2026-06-16)".
+
+- **2026-06-17 15:38 CT — Chris voice guide (verified, sent-messages only).** Saved to `memory/personal/chris-voice.md` (~21K chars). Source: `messages-334-531-4834-full.csv`, dated 2026-06-17. **Before drafting any message "from Chris" or suggesting what he should say (texts, emails, push notification text, longer relational notes, AI replies in his voice), READ this file first.** Default voice: calm, practical, direct, "we" not "you should", short paragraphs, "I think"/"I'm not mad"/"What do you need?" patterns. **Avoid:** therapist/poetic words (heart aches, sacred, attachment wound, hold space, attunement, deeply embodied, you complete me), mirroring emotional intensity, defaulting to Amanda's love language, signposting/numbered lists. **Trigger rule is in the file's last section.** Older shorter Chris examples: `memory/personal/amanda-voice.md` (misnamed filename). Pair with `memory/personal/relationships.md` for relationship drafts (Enneagram + roles + love languages).
+
 ## Known Issues / Lessons (dated; full entries: `memory/ref/known-issues-archive.md`)
+- **2026-06-29 20:04 → 20:35 CT — OpenClaw `openai-chatgpt-responses` "schema drift" was a phantom — DO NOT trust my earlier diagnosis. CORRECTION FOLLOWS:**
+  - **Original wrong claim (20:04):** I said 2026.6.10 validator dropped `openai-chatgpt-responses` from the zod enum, runtime `KnownApi` still has it, and rolled back to 2026.6.8. **This was wrong.** I was pattern-matching on the error string "Invalid input (allowed: ...)" without reading the actual enum list.
+  - **Verified wrong at 20:35 CT:** I installed 2026.6.10 to a temp prefix (`npm i -g --prefix /tmp/oc-test-610 openclaw@2026.6.10`) and ran `openclaw config validate` against Chris's actual config. **It validates clean.** Inspected `dist/types.models-C6-aKREc.js` — `MODEL_APIS` list includes `"openai-chatgpt-responses"` (it always has). The runtime `KnownApi` enum in `dist/plugin-sdk/packages/llm-core/src/types.d.ts` includes it too. Both validator and runtime accept the value. There is no enum drift.
+  - **What I probably did earlier:** I either misread an unrelated error, or the error was from an earlier state I no longer have. Either way the rollback to 2026.6.8 was unnecessary, and I should have isolated the error before rolling back the binary. I owe Chris a re-upgrade.
+  - **Real relevant change in 2026.6.10 + 2026.6.11:** the rename story is going the OTHER direction — `openai-codex-responses` is the NEW value the upstream doctor migration INTRODUCES, and PR #96257 (merged Jun 24 02:30 UTC) gives a friendly error when someone uses `openai-codex-responses` ("use `openai-chatgpt-responses`"). The runtime `KnownApi` enum STILL has only `openai-chatgpt-responses` — so if the doctor ever migrated Chris's config to `openai-codex-responses` and the runtime didn't have a transport adapter for it, calls would fail. ClawSweeper flagged this in #96197 as a "broader 5.28→6.x migration" issue; #95136 is the OAuth-profile-orphaning companion. None of this affects Chris because his config is `api: openai-chatgpt-responses`.
+  - **Action taken (20:35 CT):** deleted the false entry above. Replaced with this correction. **DO NOT** carry the rollback forward — Chris is fine to upgrade to 2026.6.10 or 2026.6.11-beta.2.
+  - **General lesson — applies to any "validator rejects a working value" diagnosis:** **before rolling back, install the suspect version to a temp prefix (`npm i -g --prefix /tmp/oc-test openclaw@<ver>`) and run the failing command against the actual config.** The temp install doesn't touch the real gateway. This is the cheap, fast, reversible verification I should have done in 20 minutes at 20:04. Going forward: any time a "validator/runtime enum drift" pattern comes up, do this first.
+  - **2026.6.11-beta.2 is the recommended upgrade target (Jun 28 23:05 UTC, ~22h old).** Includes: #96257 (clearer error for `openai-codex-responses`), #95710/95283/95744 (provider resolution fixes), #95404/95652/95624 (Codex partial-deltas / harness-activation / long-context cache stability), #95683/95845 (plugin externalization), #93351 (`openclaw agent --message-file`). No config changes needed for Chris.
+- **2026-06-21 17:25 CT — `cast_quick.py` argv interface (TRAP):** Script signature is `cast_quick.py <host> <url> <title> [volume]`. **4 args, max — not a 5-tuple.** The host_tuple `(host, 8009, uuid, model, name)` is built INSIDE `cast_quick.py` from the host arg. I passed the 5 tuple elements as separate argv and got `ValueError: not enough values to unpack (expected 5, got 3)`. Don't repeat this in `scripts/cast-quick-message.py` or any other wrapper — the caller is responsible for only the 4 scalar args. Verified end-to-end cast at 17:25 CT on Nest Hub "Living Room Display" (192.168.2.241).
 - **2026-06-14:** Trinity sermon cut-start rule — **start at the Scripture Reading of the day's text** ("Well, let me read Psalm 15, and then we'll pray together."), NOT the kids' dismissal, NOT the series intro, NOT the first detected speech burst. The auto-pick from `sermon_audio_extract.py` often catches the post-Opening-Scripture prayer or the kids' dismissal instead. Trinity service flow has 10 elements; the Scripture Reading is element #6. Full: `docs/sermon-audio.md` + run journal 2026-06-14.
 - **2026-06-14:** Trinity sermon audio recipe — bare `loudnorm=I=-16:TP=-1.5:LRA=11`, NO highpass, NO compressor. Trinity's USB recording is a clean soundboard feed, not a room mic. The highpass+compressor stack (designed for room mics) squashes LRA from 8.9 to 7.4 and adds 3dB of makeup gain, sounding harsh. Source natively measures -16.2 LUFS / 8.9 LU LRA, so loudnorm barely does anything — that's the right outcome. Full: `docs/sermon-audio.md`.
 - **2026-06-14:** Sermon Recap cron picker heuristic. Three bugs fixed today: (1) required `end_time` set → excluded CAPTURING convs; (2) required sermon keywords in summary → excluded CAPTURING convs whose summary is the most recent segment; (3) used Omi fallback. **Right heuristic: lifetime overlap with the Sunday service window (10:30 AM - 12:30 PM CT) + sermon-keyword score in the summary.** Picker at `scripts/sermon-conv-picker.py` (extracted so it's testable). Sunday sermon conv usually starts *before* 9:30 AM because Bee is on for the whole morning. **General rule:** when a content signal (summary keywords) is available, prefer it over proxy signals (start_time, end_time, file size). Verified 2026-06-14 13:55 CT picking the right conv after Chris's catch.
@@ -139,17 +201,67 @@ Full doc: `memory/ref/push-audio-pipeline.md` → "Push System Dispatcher Lesson
 - **Verify on the build host before asking user to install on another device.** Inspect the .app bundle for: `Contents/Resources/Assets.car`, `Contents/Resources/AppIcon.icns`, no `__preview.dylib` or `*.debug.dylib` anywhere. If those are clean, the widget is ready.
 - **Update Makefile default to Release**, not Debug. Current `make build` still does Debug.
 
-## Promoted From Short-Term Memory (2026-06-16)
+## Brother DCP-L2540DW Printing — Post-Mortem (2026-06-22)
 
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:12:12 -->
-- Prompt 14: What's my biggest token waste?: The biggest token waste is still broad workspace inspection in a very dirty repo. A plain `git status --short` emits a huge modified/untracked list and consumed far more context than the review needed. This repeats the 2026-06-05 finding: continuity reviews should avoid full repo status unless the question explicitly needs it. Prefer targeted checks such as cron status, disk usage, recent error logs, `git status --short -- <specific-path>`, or counted summaries. [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:12-12]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:15:18 -->
-- Suggested Action for Prompt 14:: python3 - <<'PY' import subprocess out = subprocess.run(["git", "status", "--short"], cwd="/Users/ccampos/.openclaw/workspace", text=True, capture_output=True).stdout.splitlines() print({"changed_entries": len(out), "sample": out[:20]}) [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:15-18]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:22:22 -->
-- Prompt 15: What's slow that should be fast?: The slowest unnecessary operation tonight was `du -sh ~/.openclaw/workspace ~/.openclaw`, which took long enough to require a second poll because it scans about 59G. That is acceptable occasionally, but too slow for every nightly continuity run. A cached health snapshot or lightweight size check should be used unless disk pressure is suspected. Memory search was quick enough, cron health completed in a few seconds, and the repaired preflight script now finishes immediately. [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:22-22]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:4:4 -->
-- Prompt 13: Is my environment healthy?: The environment is broadly healthy. Gateway is up with about 17h uptime, the current cron scheduler reports enabled, and the continuity cron has zero consecutive errors or skips. `bash scripts/cron-health-check.sh --critical-only` reported all crons healthy across the current cron list. Disk is healthy: `/` has about 660GiB free and the workspace is about 30G, with all of `~/.openclaw` about 59G. [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:4-4]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:6:6 -->
-- Prompt 13: Is my environment healthy?: One latent issue did show up in `logs/cron-script-preflight.launchd.err`: `scripts/openclaw-cron-script-preflight.py` was still trying to read the removed `~/.openclaw/cron/jobs.json` file. I fixed it immediately by adding a SQLite fallback to read `cron_jobs.job_json` from `~/.openclaw/state/openclaw.sqlite`, then verified `python3 scripts/openclaw-cron-script-preflight.py` returns `ok fixed=0 unresolved=0`. [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:6-6]
-<!-- openclaw-memory-promotion:memory:memory/2026-06-12.md:9:9 -->
-- Suggested Action for Prompt 13:: python3 ~/.openclaw/workspace/scripts/openclaw-cron-script-preflight.py [score=0.806 recalls=0 avg=0.620 source=memory/2026-06-12.md:9-9]
+**Three rounds of print failures in one day. Cost: ~5 wasted sheets of paper. Root cause: I shipped a broken pipeline twice and trusted "lpr returned 0" as proof of success.**
+
+The full sequence (from `/var/log/cups/access_log`):
+- 07:53: 136KB — v2 color poster, venv broken, used escape hatch. ✓ worked
+- 08:11: 5KB — my smoke test (5KB blank page, never verified on a real sheet)
+- 08:11: 136KB — v2 color poster redone after venv rebuild. ✓ worked
+- **11:51: 231KB — first landscape B&W attempt.** PDF page size was 792×445 pts (image dimensions), NOT letter. The Brother driver mis-rendered. **I never checked the PDF before sending.** ✗ broken
+- 12:36: 231KB — same broken PDF, my "dry-run" that wasn't actually a dry-run (script printed despite the flag not existing). The `lprm` returned "success" but the job ran to completion in the printer's buffer. ✗ unkillable
+- **12:44: 526KB — fixed pipeline using `cupsfilter -o media=Letter [-o landscape]`. PDF page size 792×612 pts = letter landscape. ✓ should have worked**
+- 12:47: 526KB — my accidental reprint while debugging, cancelled in CUPS but unkillable in the printer. ✗ wasted
+- 12:48: 1.1MB — a fifth waste I missed in the first post-mortem. I had sent the raw unresized PNG directly to `lpr` while testing what `lpr` does with PNG input. Sized for the printer buffer, no scaling, lands as a full-bleed image with no margins. ✗ wasted (caught on a recount 2026-06-22 14:42 CT after Chris asked for an update)
+
+**The bugs:**
+1. **No verification step.** The old `sips → lpr` pipeline created a PDF sized to the image, not letter. The script never checked, so it printed a non-standard page and the Brother driver made the best of it (auto-rotate / clip / wrong margins). The fix: `cupsfilter -o media=Letter [-o landscape]` produces a real letter PDF. The new script (2026-06-22) has a `verify_letter_pdf()` gate that calls `pdfinfo` and refuses to print anything that isn't a real letter page.
+2. **No `--dry-run` flag.** When I tried to test the broken script with `--dry-run`, the script ignored the flag and printed anyway. The new script honors `--dry-run` and produces a verify-pass message without calling `lpr`.
+3. **`lprm` does not always cancel a print job.** Once a job reaches the printer's internal buffer, CUPS-side cancellation cannot stop it. I confirmed this on 2026-06-22 by reading `/var/log/cups/error_log`: jobs 58 and 60 both logged "Unable to cancel print job" AFTER I had issued `lprm` and seen it return success. **Implication: a "test print" sent to this printer is a real cost, not a reversible action.** Treat every `lpr` call as if the paper is already in the printer.
+
+**The lesson (for the next pipeline that ends in paper/ink/screen output):**
+- "lpr returned 0" is **not** verification. It means "CUPS accepted the job," which is the same thing as "I queued it for the printer." The printer may still mis-render.
+- For any pipeline that emits a PDF/PPML/JPEG to physical media: **parse the intermediate artifact and assert the page geometry** before the final send. `pdfinfo` is the cheap version. For more complex formats, render to image and visually inspect.
+- A "test print" flag is a false economy if it doesn't actually suppress the send. Make `--dry-run` an explicit no-op end-to-end, including no `lpr` call.
+- If the user expresses frustration, do not keep reprinting in a "fix the bug" loop. The cost of the paper is non-zero and non-reversible. Stop, fix the script, test with `--dry-run` until the verify gate passes, then ask the user before sending a real job.
+
+**Native macOS print pipeline replaces hand-rolled cupsfilter (2026-06-22 15:05 CT):**
+After the post-mortem, Chris suggested using native macOS print functions so the system handles rotate/scale/fit. I traced what `lp` does internally and confirmed it produces the same output as my hand-rolled pipeline:
+- `cgimagetopdf` (Quartz PNG→PDF) + `cgpdftoraster` (PDF→URF raster at 300 DPI, with proper PPD and rotation baked in) → IPP send raw URF to printer.
+- `scripts/print-png.py` rewritten: Pillow B&W (optional) → `lp -d Brother_DCP_L2540DW -o media=Letter -o orientation-requested={3|4} -o fitplot [-o ColorModel=Gray]`. One tool instead of three.
+- `--dry-run` runs the same `cgimagetopdf` + `pdftoppm` chain offline and saves preview PNG to `state/print-preview/last-preview.png`. No paper used.
+- **Lesson reinforced:** the natural macOS print pipeline is the right default for IPP Everywhere printers. Custom pipelines (mine included) tend to re-implement what the OS already does, badly. Reach for `lp` first.
+
+**Reference doc with full pipeline + traps:** `TOOLS.md` → "Brother DCP-L2540DW Printing". Verification gate + `--dry-run` are in `scripts/print-png.py` (2026-06-22 rewrite).
+
+## Worship Song Naming Convention (2026-06-25)
+- Files uploaded to Drive folder `1pTCYdgQ9xc91sMLacAq22BMX2I2ZpoJz` use **CamelCase + ISO date**: `KingofKings-2026-06-21.mp3`.
+- Date auto-detected by `scripts/worship_song_extract.py` from `R_YYYYMMDD-HHMMSS.wav` filename; `--date YYYY-MM-DD` overrides.
+- Older undated lowercase files (e.g. `kingofkings.mp3`) coexist in the folder — Chris's preferred convention going forward is the dated CamelCase.
+- When updating the naming for an existing upload, **trash the old version in the same run** (use `gws drive files update --json '{"trashed":true}'` — `--params` doesn't accept body fields).
+- Detection pipeline: `scripts/worship_song_extract.py` uses **energy-based block detection** (RMS over 2s windows, -32 dB threshold) intersected with whisper-classified song segments (≥5s overlap required). Sermon region excluded by `outputs/sermons/<file>.decision.json`. Cached whisper segments at `wav_path.with_suffix(".worship-segments.json")` — re-running with tweaks only takes seconds.
+
+## Trinity Sermon Transcripts — Path A/B/C Status (2026-06-28)
+- **Path B (amp-api JWT) DEAD.** Token works (HTTP 200) but Apple's `include[podcast-episodes]=transcripts` returns nothing for Trinity AND Joe Rogan. amp-api doesn't expose transcripts via that endpoint.
+- **Path A (Apple Podcasts app) BLOCKED.** Trinity not subscribed in user's local library (0 podcasts, 0 episodes). macOS won't let me drive Apple Podcasts UI without assistive-access permission (error -1719).
+- **iOS Shortcut Path (untried).** Could write a Shortcut that plays each Trinity episode for ~15s on user's iPhone to trigger TTML caching. Would sync to Mac via Group Containers. Requires user's iPhone.
+- **Recommended: Whisper Path C.** 68 audio files at `medium` model = ~3-4 hours of compute, parallelizable. No permission grants needed.
+- Bearer JWT extracted from Cache.db (ES256, kid=M6YC84O5FE, exp=2026-07-28) — works but doesn't unlock transcript fetch.
+- Full status: `projects/trinity-fellowship/PATH-A-B-STATUS.md`
+
+## Trinity Sermon Transcription — Apple Silicon MPS (2026-06-30)
+- **Path D (whisper-large-v3 + `--device mps`):** ~5-10x faster than Path C CPU+FP32. M1 32-min sermon: CPU = 8-10 min, MPS = ~2-3 min. Model lives in unified memory on Metal GPU (RSS drops from ~3.8 GB to ~75 MB).
+- **Wrapper script:** `projects/trinity-fellowship/scripts/transcribe-sermon.py` — defaults to `--device mps --model large-v3`. Always pass this script's full path; the venv's whisper binary is NOT on PATH.
+- **CRITICAL TRAP (verified 2026-06-30 16:50 CT):** the M1 has ONE Metal device. Two `--device mps` whisper jobs in parallel contend for it and **both stall at ~10-15% CPU**. They DO NOT serialize cleanly; they each think they're running alone and silently share the GPU. Killed my parallel MLX benchmark, sub-agent's whisper went from 9% → 34% within 30s. **Rule: never run a second MPS job while another MPS job is running on the same Mac.** Wait for one to finish, then start the other. This applies to all MPS workloads (whisper, mlx-whisper, anything using PyTorch's MPS backend) — they share the single Metal device.
+- **Why the sub-agent discovered this on its own:** the brief told it to use `whisper` with defaults; defaults = CPU. The agent noticed "FP16 is not supported on CPU" in the log, hypothesized that MPS would be faster, and tried `--device mps`. Took ~45 min of orchestration overhead to get the background-process right. Captured in `projects/trinity-fellowship/TRANSCRIBE.md` so future sub-agents don't repeat.
+- **Other paths I tried and rejected (2026-06-30):** `mlx-whisper` (Apple MLX framework, ~2.9 GB model download, similar speed to MPS, more setup overhead), `faster-whisper` int8 CPU (already running for Telegram voice notes, ~4x faster than openai/whisper CPU but slower than MPS). MPS path wins because it's already in the existing venv and model cache.
+- **Recipe + traps:** `projects/trinity-fellowship/TRANSCRIBE.md`. **TOOLS.md** has the same traps under "Trinity Sermon Transcription (MPS, 2026-06-30)".
+- **Future sub-agents: always pass `--device mps` in the brief.** Don't make them discover it.
+
+## Promoted From Short-Term Memory (2026-06-30)
+
+<!-- openclaw-memory-promotion:memory:memory/2026-06-25.md:6:6 -->
+- Prompt 10: Where did I misread the room?: Yesterday's clearest miss was treating "week over week comparison" in the Journey of Hope workbook as a charting detail instead of the central framing of the ask. I also overtrusted image interpretation on Franklin's decoder ring, producing multiple rebuilds before accepting Chris's direct readout as ground truth. The room was asking for precision, verification, and less improvisation. [score=0.828 recalls=0 avg=0.620 source=memory/2026-06-25.md:6-6]
+<!-- openclaw-memory-promotion:memory:memory/2026-06-25.md:9:9 -->
+- Suggested Action for Prompt 10:: python3 scripts/git-status-summary.py --json --limit 20 --top 10 --out /tmp/workspace_status_summary.json [score=0.828 recalls=0 avg=0.620 source=memory/2026-06-25.md:9-9]
