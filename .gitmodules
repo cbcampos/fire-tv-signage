@@ -1,0 +1,3 @@
+[submodule "projects/trinity-fellowship"]
+	path = projects/trinity-fellowship
+	url = https://github.com/cbcampos/trinity-fellowship-projects.git
