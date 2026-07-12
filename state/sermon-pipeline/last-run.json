@@ -7,12 +7,12 @@
       "cut_completed_at": "2026-07-12T13:13:00-05:00",
       "cut_decision": {
         "mode": "manual",
-        "start_hms": "00:22:42.000",
+        "start_hms": "00:18:27.000",
         "end_hms": "00:50:33.000",
-        "duration_seconds": 1671,
-        "start_sec": 1362.0,
+        "duration_seconds": 1926,
+        "start_sec": 1107.0,
         "end_sec": 3033.0,
-        "manual_reason": "Chris fourth correction 13:35 CT: cut-end extended 3 min 18 sec. The 47:10 'amen' (p=0.27) was a faster-whisper hallucination mid-sentence while Sam was still preaching exposition; the real concluding prayer ended with 'We love you Lord, amen' at 50:28. Pastoral 'Thank you, Sam' at 51:03 marks the hand-off, communion set-up begins at 51:04 ('Well, as we come now to the Lord's table'). Cut end 50:33 = 5 sec after real amen, before pastoral thank-you and communion invitation."
+        "manual_reason": "Chris fifth correction 13:34 CT: include Sam's full intro (personal sharing about himself, his kids, Brandon's encouragement, the Sturt All Yet quote, the humility of approaching the text) BEFORE 'Let me pray'. Cut starts at Sam's first word 'Good morning, everyone.' at 1107.2s (18:27 source). The earlier 22:42 cut missed ~3 min 35 sec of intro ('Good morning' through '...who sits enthroned in heaven with angels bowing down before him'). End unchanged from 50:33 (5 sec after the real 'We love you Lord, amen' at 50:28)."
       },
       "loudness_measured_db": -36.5,
       "loudnorm_applied": true,
@@ -53,7 +53,7 @@
         "finished_at": "2026-07-12T13:00:00-05:00",
         "note": "large-v3 produced NaN logits on last segment (MPS precision boundary); base transcript from cut detection was used instead \u2014 content matches and is sufficient for LLM summary."
       },
-      "manual_correction_at": "2026-07-12T13:35:00-05:00",
+      "manual_correction_at": "2026-07-12T13:34:00-05:00",
       "manual_correction_by": "chris"
     }
   ]
