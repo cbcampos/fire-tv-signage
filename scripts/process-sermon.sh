@@ -113,31 +113,35 @@ sys.exit(1)
 fi
 
 # ---- Step 1: CUT sermon-only WAV ----
+# sermon_audio_extract.py produces files named <basename>.sermon.<ext> (NOT .sermon-only.*)
+# Tolerate both patterns so the wrapper survives upstream rename.
 echo "=== Step 1: CUT sermon-only WAV ==="
-SERMON_WAV="$SERMONS_DIR/$(basename "${SERVICE_AUDIO%.*}").sermon-only.wav"
-if [[ ! -f "$SERMON_WAV" || "$SCRIPT_FORCE" == "1" ]]; then
+SERMON_BASENAME="$(basename "${SERVICE_AUDIO%.*}")"
+# Look in either naming convention, prefer the most recent
+SERMON_WAV="$(ls -t "$SERMONS_DIR/$SERMON_BASENAME".sermon*.wav 2>/dev/null | head -1)"
+if [[ -z "$SERMON_WAV" || "$SCRIPT_FORCE" == "1" ]]; then
   python3 "$WORKSPACE/scripts/sermon_audio_extract.py" \
     "$SERVICE_AUDIO" --transcribe auto --output-dir "$SERMONS_DIR"
-  # Extract prefers .wav extension or uses its own naming; tolerate both
-  derived="$(ls "$SERMONS_DIR"/$(basename "${SERVICE_AUDIO%.*}").sermon-only.* 2>/dev/null | head -1)"
+  derived="$(ls -t "$SERMONS_DIR/$SERMON_BASENAME".sermon*.{wav,mp3} 2>/dev/null | head -1)"
   if [[ -z "$derived" ]]; then
     echo "sermon_audio_extract.py did not produce a sermon-only file" >&2
     exit 1
   fi
   echo "Cut produced: $derived"
 else
-  echo "Reusing existing sermon-only file: $SERMON_WAV"
+  echo "Reusing existing cut file: $SERMON_WAV"
 fi
 
-# Final sermon-only WAV path (may be mono / stereo — both fine for downstream)
-SERMON_WAV="$(ls "$SERMONS_DIR"/$(basename "${SERVICE_AUDIO%.*}").sermon-only.* 2>/dev/null | grep -E '\.wav$' | head -1)"
-[[ -z "$SERMON_WAV" ]] && SERMON_WAV="$(ls "$SERMONS_DIR"/$(basename "${SERVICE_AUDIO%.*}").sermon-only.* 2>/dev/null | head -1)"
+# Final sermon WAV path (may be mono / stereo — both fine for downstream)
+SERMON_WAV="$(ls -t "$SERMONS_DIR/$SERMON_BASENAME".sermon*.wav 2>/dev/null | head -1)"
 echo "Master WAV: $SERMON_WAV"
 
 # ---- Step 2: LOUDNESS check + normalize-only-if-quiet ----
 echo
 echo "=== Step 2: LOUDNESS check (no editing other than normalize-if-quiet) ==="
 SERMON_MP3="$SERMONS_DIR/$(basename "${SERVICE_AUDIO%.*}").sermon-only.mp3"
+# Tolerate cut script naming — if no .sermon-only.mp3 yet, also check .sermon.mp3
+[[ ! -f "$SERMON_MP3" && -f "$SERMONS_DIR/$SERMON_BASENAME.sermon.mp3" ]] && SERMON_MP3="$SERMONS_DIR/$SERMON_BASENAME.sermon.mp3"
 TMP_VOL="$(mktemp -t sermon-vol).txt"
 ffmpeg -hide_banner -i "$SERMON_WAV" -af volumedetect -f null - 2> "$TMP_VOL" || true
 mean_db="$(grep -E 'mean_volume:' "$TMP_VOL" | awk '{print $5}' | tr -d ' -')"
