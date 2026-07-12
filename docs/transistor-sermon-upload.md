@@ -61,7 +61,7 @@ If manual metadata is provided with `--title`, `--speaker`, `--author`, `--scrip
 Manual metadata mapping:
 - `--title` -> Transistor episode title
 - `--speaker` or `--author` -> Transistor author
-- `--scripture` -> Transistor description as `Scripture Passage: <passage>` unless `--description` is provided. If BOTH `--scripture` and `--description` are passed, the scripture header is prepended to the description so the workflow rule "Scripture Passage: ___ at the top of the episode description" is always satisfied. Re-running the script with the same arguments is idempotent — the existing header is detected and replaced cleanly (no double-header).
+- `--scripture` -> Prepends `<p>Scripture Passage: <passage></p>` to the description. Older Trinity episodes follow this format with `<p>` HTML wrapping so podcast players (Apple Podcasts, Spotify, Overcast) render the header on its own line. If BOTH `--scripture` and `--description` are passed, the result is `<p>Scripture Passage: <passage></p><p>...</p>`. Re-running with the same args is idempotent — the existing header (with or without `<p>` wrap) is detected and replaced cleanly (no double-header). Plain-text `\n\n` collapses to a single line in most players; HTML `<p>` is what renders breaks.
 - `--service-date` -> dry-run/reporting metadata only
 
 ## Safe default

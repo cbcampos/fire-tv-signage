@@ -3,6 +3,7 @@ import argparse
 import json
 import mimetypes
 import os
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -163,16 +164,28 @@ def main():
     if scripture_header:
         if description:
             # Workflow requires 'Scripture Passage: ___' at the top of the description.
-            stripped = description.lstrip()
-            if stripped.lower().startswith("scripture passage:"):
-                # Existing header present — replace with the canonical one and keep the body.
-                after_header = stripped.split("\n", 1)[1] if "\n" in stripped else ""
-                after_header = after_header.lstrip("\n")
-                description = f"{scripture_header}\n\n{after_header}" if after_header else scripture_header
+            # Older Trinity episodes wrap in <p>...</p> so podcast players render
+            # paragraph breaks. Plain-text \n\n collapses to a single line in
+            # Apple Podcasts and most players.
+            #
+            # Normalize: convert </p><p> (or </p>\n<p>) into a paragraph
+            # separator, strip remaining <p>/</p> wrappers, then strip any
+            # leading 'Scripture Passage:'/'Scripture Reading:' header line
+            # (idempotent re-prepend). Re-wrap in <p>...</p>.
+            normalized = re.sub(r"</p>\s*<p>", "\n\n", description, flags=re.IGNORECASE)
+            normalized = re.sub(r"</?p>", "", normalized, flags=re.IGNORECASE).strip()
+            normalized = re.sub(
+                r"^\s*(scripture\s+(passage|reading):\s+[^\n]+?)\s*(?:\n+|$)",
+                "",
+                normalized,
+                flags=re.IGNORECASE,
+            ).strip()
+            if normalized:
+                description = f"<p>{scripture_header}</p><p>{normalized}</p>"
             else:
-                description = f"{scripture_header}\n\n{description}"
+                description = f"<p>{scripture_header}</p>"
         else:
-            description = scripture_header
+            description = f"<p>{scripture_header}</p>"
     author = (
         args.author
         if args.author is not None
